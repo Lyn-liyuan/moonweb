@@ -55,7 +55,6 @@ We welcome contributions in any form, including but not limited to:
 - Documentation improvements
 
 
-
 **Known Limitations**
 
 - Currently, Moonweb does not support Server Sent Events (SSE), which means that chat responses will be displayed all at once on the web after the model generates them.
@@ -68,4 +67,4 @@ This project is licensed under the "MIT License".
 
 - Project Maintainer: [LYN]
 - Email: [yuanli13@asu.edu]
-- GitHub: [@yourusername](https://github.com/Lyn-liyuan)
+- GitHub: [@LYN](https://github.com/Lyn-liyuan)
