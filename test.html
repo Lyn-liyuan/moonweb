@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat Page</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+
+</head>
+
+<body class="bg-gray-100 flex items-center justify-center h-screen">
+ 
+    <div class="w-full max-w-2xl bg-white shadow-lg rounded-lg overflow-hidden flex flex-col h-5/6">
+        <!-- Chat Header -->
+        <div class="border-b px-4 py-2 bg-gray-200">
+            <h1 class="text-lg font-semibold">Chat Room</h1>
+        </div>
+
+        <!-- Chat Messages -->
+        <div id="chat-box" class="flex-1 p-4 overflow-y-auto">
+            <!-- Example messages -->
+            <div class="flex mb-4">
+                <div class="bg-gray-300 p-3 rounded-r-lg rounded-bl-lg">
+                    <p>Hello! How are you?</p>
+                </div>
+            </div>
+            <div class="flex justify-end mb-4">
+                <div class="bg-blue-500 text-white p-3 rounded-l-lg rounded-br-lg">
+                    <p>I'm good, thank you!</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Input Box -->
+        <div class="border-t px-4 py-2 bg-gray-200 flex items-center">
+            <input type="file" id="image-input" class="hidden" accept="image/*">
+            <label for="image-input" class="cursor-pointer bg-gray-300 p-2 mr-4 rounded-lg hover:bg-gray-400">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                </svg>
+            </label>
+            <input type="text" placeholder="Type a message..." id="message-input" class="flex-1 px-4 py-2 mr-4 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400">
+            <button class="bg-blue-500 text-white px-4 py-2 rounded-lg" onclick="sendMessage()">Send</button>
+        </div>
+    </div>
+
+    <script>
+        const chatBox = document.getElementById('chat-box');
+        const messageInput = document.getElementById('message-input');
+        const imageInput = document.getElementById('image-input');
+
+        function sendMessage() {
+            const messageText = messageInput.value.trim();
+            if (messageText) {
+                addMessage(messageText, 'outgoing');
+                messageInput.value = '';
+            }
+        }
+
+        imageInput.addEventListener('change', function() {
+            const file = this.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    addImage(e.target.result, 'outgoing');
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+
+        function addMessage(text, type) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `flex ${type === 'outgoing' ? 'justify-end' : ''} mb-4`;
+            messageDiv.innerHTML = `<div class="${type === 'outgoing' ? 'bg-blue-500 text-white' : 'bg-gray-300'} p-3 rounded-lg">${text}</div>`;
+            chatBox.appendChild(messageDiv);
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+
+        function addImage(src, type) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `flex ${type === 'outgoing' ? 'justify-end' : ''} mb-4`;
+            messageDiv.innerHTML = `<div class="${type === 'outgoing' ? 'bg-blue-500 text-white' : 'bg-gray-300'} p-3 rounded-lg"><img src="${src}" alt="Image" class="rounded-lg"></div>`;
+            chatBox.appendChild(messageDiv);
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+    </script>
+   
+</body>
+
+</html>

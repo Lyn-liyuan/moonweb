@@ -1,0 +1,16 @@
+{
+    "name": "Dioxus",
+    
+    "start_url": "/",
+    "id": "/",
+    "display": "standalone",
+    "display_override": ["window-control-overlay", "standalone"],
+    "scope": "/",
+    "theme_color": "#000000",
+    "background_color": "#ffffff",
+    "short_name": "Dioxus",
+    "description": "Dioxus is a portable, performant, and ergonomic framework for building cross-platform user interfaces in Rust.",
+    "dir": "ltr",
+    "lang": "en",
+    "orientation": "portrait"
+  }

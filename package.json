@@ -1,0 +1,8 @@
+{
+  "dependencies": {
+    "flowbite": "^2.3.0"
+  },
+  "devDependencies": {
+    "tailwindcss": "^3.4.3"
+  }
+}
