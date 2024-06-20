@@ -13,6 +13,7 @@ use hf_hub::{api::sync::Api, Repo, RepoType};
 use tokenizers::Tokenizer;
 use crate::model::TextGenModel;
 use crate::data::{Message,Role};
+use crate::str_output_stream::OutputStream;
 
 
 pub struct TextGeneration {
@@ -51,7 +52,7 @@ impl TextGeneration {
 impl TextGenModel for TextGeneration {
     
 
-    fn run(&mut self, prompt: &str, sample_len: usize) -> Result<String, Error> {
+    fn run(&mut self,output:&dyn OutputStream, prompt: &str, sample_len: usize) -> Result<(), Error> {
         use std::io::Write;
         println!("starting the inference loop");
         self.model.clear_kv_cache();
@@ -98,21 +99,19 @@ impl TextGenModel for TextGeneration {
             if next_token == eos_token {
                 break;
             }
-            self.tokenizer.put_token(next_token);
-            // if let Some(t) = self.tokenizer.next_token(next_token).expect("tokenizer netx_token failed!") {
-            //     print!("{t}");
-            //     content.push_str(t.as_str());
-            //     std::io::stdout().flush()?;
-            // }
+           
+            if let Some(t) = self.tokenizer.next_token(next_token).expect("tokenizer netx_token failed!") {
+                output.write(t)?
+            }
             pos += context_size;
         }
-        let content = self.tokenizer.decode_all().expect("decode text failed!");
+        output.end().unwrap();
         let dt = start_gen.elapsed();
         println!(
             "\n{generated_tokens} tokens generated ({:.2} token/s)",
             generated_tokens as f64 / dt.as_secs_f64(),
         );
-        Ok(content)
+        Ok(())
     }
     
     fn messages_chat_template(&self,msg_list: &Vec<Message>,system_prompt:&str)->String {

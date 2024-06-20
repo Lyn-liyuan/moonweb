@@ -1,11 +1,12 @@
 #![allow(non_snake_case, unused)]
 extern crate image_base64_wasm;
-use crate::apiserver::chat;
+use crate::apiserver::chat_stream;
 use crate::data::{Message, Role};
 use dioxus::prelude::*;
 use dioxus_logger::tracing::{info, Level};
 use serde::{Deserialize, Serialize};
 use web_sys::window;
+use futures::StreamExt;
 
 #[component]
 fn Pulse() -> Element {
@@ -178,8 +179,12 @@ fn ModelConfig(model_id: Signal<String>,endpoint: Signal<String>) -> Element {
 
 #[component]
 fn ShowMessage(msg: Message) -> Element {
-    use markdown;
-    let html = markdown::to_html(&msg.content);
+    use comrak::{markdown_to_html, Options,ExtensionOptions};
+    let mut options = Options::default();
+    options.extension.table = true;
+    options.extension.math_code = true;
+    options.extension.multiline_block_quotes = true;
+    let html = markdown_to_html(msg.content.as_str(),&options);
     rsx!(if msg.role == Role::User {
            div { class: "flex justify-end mb-4",
                 div { class: "bg-blue-500 text-white p-3 rounded-l-lg rounded-br-lg",
@@ -205,6 +210,7 @@ fn ShowMessage(msg: Message) -> Element {
 }
 
 fn sendMsg(msg: String,model_id:String,url:String) {
+    
     if msg != "" {
         let mut history = use_context::<Signal<Vec<Message>>>();
         let id = history().len();
@@ -226,11 +232,16 @@ fn sendMsg(msg: String,model_id:String,url:String) {
         let history_clone = history.read()[..id].to_owned();
 
         spawn(async move {
-            if let Ok(msg) = chat(history_clone,model_id,url).await {
+            if let Ok(stream) = chat_stream(history_clone,model_id,url).await {
                 let mut history = use_context::<Signal<Vec<Message>>>();
-                let mut message = &mut history.write()[id];
-                message.content = msg;
-                message.loading = false;
+                
+                let mut stream = stream.into_inner();
+                while let Some(Ok(text)) = futures::StreamExt::next(&mut stream).await {
+                    let mut message = &mut history.write()[id];
+                    message.content.push_str(&text);
+                    message.loading = false;
+                }
+                
             }
         });
     }
@@ -239,7 +250,7 @@ fn sendMsg(msg: String,model_id:String,url:String) {
 pub fn app() -> Element {
     use_context_provider(|| Signal::new(Vec::<Message>::new()));
     let mut model_id = use_signal(|| String::from("meta-llama/Meta-Llama-3-8B-Instruct"));
-    let mut endpoint = use_signal(|| String::from("http://localhost:3081"));
+    let mut endpoint = use_signal(|| String::from("http://localhost:3081/chat"));
     let mut new_msg = use_signal(String::new);
     let mut send_disabled = use_signal(|| false);
     use_effect(move || {

@@ -3,9 +3,11 @@ use core::str;
 use crate::data::Message;
 use crate::llama;
 use anyhow::{Error, Result};
+use crate::str_output_stream::OutputStream;
+
 
 pub trait TextGenModel {
-    fn run(&mut self, prompt: &str, sample_len: usize) -> Result<String, Error>;
+    fn run(&mut self, output:&dyn OutputStream,prompt: &str, sample_len: usize) -> Result<(), Error>;
     fn messages_chat_template(&self, msg_list: &Vec<Message>, system_prompt: &str) -> String;
 }
 

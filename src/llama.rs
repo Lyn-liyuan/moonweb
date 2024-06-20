@@ -13,6 +13,7 @@ use model::{Llama, LlamaConfig, Config};
 
 use crate::token_output_stream::TokenOutputStream;
 use crate::model::TextGenModel;
+use crate::str_output_stream::OutputStream;
 use tokenizers::Tokenizer;
 
 
@@ -63,7 +64,7 @@ impl TextGeneration {
 }
 
 impl TextGenModel for TextGeneration {
-    fn run(&mut self, prompt: &str, sample_len: usize) -> Result<String, Error> {
+    fn run(&mut self, output:&dyn OutputStream, prompt: &str, sample_len: usize) -> Result<(), Error> {
         self.tokenizer.clear();
         let mut tokens = self
             .tokenizer
@@ -111,14 +112,13 @@ impl TextGenModel for TextGeneration {
             if Some(next_token) == self.eos_token_id {
                 break;
             }
-            self.tokenizer.put_token(next_token);
-            // if let Some(t) = self.tokenizer.next_token(next_token)? {
-            //     print!("{t}");
-            //     std::io::stdout().flush()?;
-            // }
+            
+            if let Some(t) = self.tokenizer.next_token(next_token)? {
+                output.write(t)?;
+            }
 
         }
-        let content = self.tokenizer.decode_all().expect("decode text failed!");
+        output.end().unwrap();
         if let Some(rest) = self.tokenizer.decode_rest().map_err(Error::msg)? {
             print!("{rest}");
         }
@@ -128,7 +128,7 @@ impl TextGenModel for TextGeneration {
             token_generated,
             (token_generated - 1) as f64 / dt.as_secs_f64(),
         );
-        Ok(content)
+        Ok(())
     }
     fn messages_chat_template(&self,msg_list: &Vec<Message>,system_prompt:&str)->String {
         let mut history = String::new();

@@ -38,7 +38,7 @@ struct Args {
     server: Option<ServerNode>,
 
     #[clap(short, long)]
-    port: Option<u32>,
+    ipc_name: Option<String>,
 
     #[clap(short, long)]
     model_id: Option<String>,
@@ -80,11 +80,11 @@ fn main() {
                 .unwrap_or_else(|| "meta-llama/Meta-Llama-3-8B-Instruct".into());
             let temp = args.temp.unwrap_or_else(|| 0.6f64);
             let top_p = args.top_p.unwrap_or_else(|| 0.9f64);
-            let port = args.port.unwrap_or_else(|| 11000);
+            let ipc_name = args.ipc_name.unwrap();
             let runtime = tokio::runtime::Runtime::new().expect("Create runtime failed!");
             runtime.block_on(worker_server(
+                ipc_name,
                 model_id.clone(),
-                port,
                 temp,
                 top_p,
             ));

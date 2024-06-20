@@ -6,8 +6,8 @@ Welcome to Moonweb, a web chat tool developed with Rust, Dioxus, and Candle fram
 
 - **Multi-Model Support**: Seamless integration of various open-source LLMs.
 - **Dynamic Model Loading**: Supports dynamic loading and unloading of models at runtime.
-- **Independent Process Isolation**: Each model runs in an independent process, providing services through ZeroMQ, ensuring stability and responsiveness.
-- **Web Interface**: A responsive and user-friendly web interface built with the Dioxus framework.
+- **Independent Process Isolation**: Each model runs in an independent process, providing services through ipc_channel, ensuring stability and responsiveness.
+- **Web Interface**: A responsive and user-friendly web interface built with the Dioxus framework. It supports SSE(Server send event).
 - **Open Source**: Fully open source, encouraging community contributions and customization.
 
 **Quick Start**
@@ -35,13 +35,13 @@ Welcome to Moonweb, a web chat tool developed with Rust, Dioxus, and Candle fram
 
 - **Frontend**: The web interface built with Dioxus, responsible for displaying chat content and user input.
 - **Backend**: Rust backend services that handle web requests and communicate with LLM model services.
-- **Model Services**: Each LLM model runs as an independent process, communicating with the backend service via ZeroMQ.
+- **Model Services**: Each LLM model runs as an independent process, communicating with the backend service via ipc_channel.
 
 **Model Integration**
 
 To integrate a new LLM model, follow these steps:
 
-1. Create a model service process that implements ZeroMQ communication.
+1. Create a model service process that implements ipc_channel communication.
 1. Register the communication interface of the model service in the backend service.
 1. Update the frontend interface to support input and output for the new model.
 
@@ -54,10 +54,6 @@ We welcome contributions in any form, including but not limited to:
 - Bug reports
 - Documentation improvements
 
-
-**Known Limitations**
-
-- Currently, Moonweb does not support Server Sent Events (SSE), which means that chat responses will be displayed all at once on the web after the model generates them.
 
 **License**
 
