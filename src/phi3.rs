@@ -67,7 +67,7 @@ impl TextGenModel for TextGeneration {
 
         let mut tokens = tokens.get_ids().to_vec();
         let mut generated_tokens = 0usize;
-        let eos_token = match self.tokenizer.get_token("<|endoftext|>") {
+        let eos_token = match self.tokenizer.get_token("<|end|>") {
             Some(token) => token,
             None => anyhow::bail!("cannot find the endoftext token"),
         };
@@ -182,10 +182,10 @@ pub fn load() -> impl TextGenModel {
  phi3,
         tokenizer,
         299792458u64,
-        Some(0.3f64),
-        Some(0.9f64),
-        1.9f32,
+        Some(0.7f64),
+        Some(0.95f64),
+        2.8f32,
         16usize,
-        &device,
-   )
+        &device)
+   
 }

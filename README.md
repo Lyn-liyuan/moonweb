@@ -10,6 +10,8 @@ Welcome to Moonweb, a web chat tool developed with Rust, Dioxus, and Candle fram
 - **Web Interface**: A responsive and user-friendly web interface built with the Dioxus framework. It supports SSE(Server send event).
 - **Open Source**: Fully open source, encouraging community contributions and customization.
 
+[![Moonweb Screen Recording Video](https://github.com/Lyn-liyuan/moonweb/blob/main/moonweb_screenshot.png?raw=true)](https://youtu.be/AfdswX82FOo "Moonweb Screen Recording Video")
+
 **Quick Start**
 
 1. **Install Rust**: Ensure that Rust is installed on your system. Visit the [Rust official website](https://www.rust-lang.org/) for installation instructions.
