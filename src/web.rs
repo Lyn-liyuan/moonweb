@@ -1,12 +1,12 @@
 #![allow(non_snake_case, unused)]
 extern crate image_base64_wasm;
-use crate::apiserver::chat_stream;
+//use crate::apiserver::chat_stream;
 use crate::data::{Message, Role};
 use dioxus::prelude::*;
 use dioxus_logger::tracing::{info, Level};
+use futures::StreamExt;
 use serde::{Deserialize, Serialize};
 use web_sys::window;
-use futures::StreamExt;
 
 #[component]
 fn Pulse() -> Element {
@@ -29,7 +29,7 @@ fn Pulse() -> Element {
 }
 
 #[component]
-fn ModelConfig(model_id: Signal<String>,endpoint: Signal<String>) -> Element {
+fn ModelConfig(model_id: Signal<String>, endpoint: Signal<String>) -> Element {
     rsx!(
         div {
             "aria-hidden": "true",
@@ -80,7 +80,7 @@ fn ModelConfig(model_id: Signal<String>,endpoint: Signal<String>) -> Element {
                                         model_id.set(value);
                                     },
                                     option { "Select model" }
-                                    
+
                                     option {
                                         value: "microsoft/Phi-3-medium-4k-instruct",
                                         selected: model_id() == "microsoft/Phi-3-medium-4k-instruct",
@@ -179,12 +179,12 @@ fn ModelConfig(model_id: Signal<String>,endpoint: Signal<String>) -> Element {
 
 #[component]
 fn ShowMessage(msg: Message) -> Element {
-    use comrak::{markdown_to_html, Options,ExtensionOptions};
+    use comrak::{markdown_to_html, ExtensionOptions, Options};
     let mut options = Options::default();
     options.extension.table = true;
     options.extension.math_code = true;
     options.extension.multiline_block_quotes = true;
-    let html = markdown_to_html(msg.content.as_str(),&options);
+    let html = markdown_to_html(msg.content.as_str(), &options);
     rsx!(if msg.role == Role::User {
            div { class: "flex justify-end mb-4",
                 div { class: "bg-blue-500 text-white p-3 rounded-l-lg rounded-br-lg",
@@ -209,8 +209,7 @@ fn ShowMessage(msg: Message) -> Element {
     )
 }
 
-fn sendMsg(msg: String,model_id:String,url:String) {
-    
+fn sendMsg(msg: String, model_id: String, url: String) {
     if msg != "" {
         let mut history = use_context::<Signal<Vec<Message>>>();
         let id = history().len();
@@ -231,17 +230,50 @@ fn sendMsg(msg: String,model_id:String,url:String) {
         });
         let history_clone = history.read()[..id].to_owned();
 
+        // spawn(async move {
+        //     if let Ok(stream) = chat_stream(history_clone,model_id,url).await {
+        //         let mut history = use_context::<Signal<Vec<Message>>>();
+
+        //         let mut stream = stream.into_inner();
+        //         while let Some(Ok(text)) = futures::StreamExt::next(&mut stream).await {
+        //             let mut message = &mut history.write()[id];
+        //             message.content.push_str(&text);
+        //             message.loading = false;
+        //         }
+
+        //     }
+        // });
         spawn(async move {
-            if let Ok(stream) = chat_stream(history_clone,model_id,url).await {
-                let mut history = use_context::<Signal<Vec<Message>>>();
-                
-                let mut stream = stream.into_inner();
-                while let Some(Ok(text)) = futures::StreamExt::next(&mut stream).await {
-                    let mut message = &mut history.write()[id];
-                    message.content.push_str(&text);
-                    message.loading = false;
+            use crate::data::Request;
+            use eventsource_stream::Eventsource;
+            use reqwest::Client;
+            let mut stream = Client::new()
+                .post(url)
+                .json(&Request {
+                    cmd: model_id,
+                    msg_list: history_clone,
+                })
+                .send()
+                .await
+                .unwrap()
+                .bytes_stream()
+                .eventsource();
+            let mut history = use_context::<Signal<Vec<Message>>>();
+
+            while let Some(event) = futures::StreamExt::next(&mut stream).await {
+                match event {
+                    Ok(event) => {
+                        if event.data == "[DONE]" {
+                            break;
+                        }
+                        let mut message = &mut history.write()[id];
+                        message.content.push_str(event.data.as_str());
+                        message.loading = false; 
+                    }
+                    Err(_) => {
+                        panic!("Error in event stream")
+                    }
                 }
-                
             }
         });
     }
@@ -250,7 +282,7 @@ fn sendMsg(msg: String,model_id:String,url:String) {
 pub fn app() -> Element {
     use_context_provider(|| Signal::new(Vec::<Message>::new()));
     let mut model_id = use_signal(|| String::from("meta-llama/Meta-Llama-3-8B-Instruct"));
-    let mut endpoint = use_signal(|| String::from("http://localhost:3081/chat"));
+    let mut endpoint = use_signal(|| String::from("http://localhost:8080/api/chat"));
     let mut new_msg = use_signal(String::new);
     let mut send_disabled = use_signal(|| false);
     use_effect(move || {
@@ -275,7 +307,7 @@ pub fn app() -> Element {
         if !send_disabled() {
             send_disabled.set(true);
             info!("send message");
-            sendMsg(new_msg(),model_id(),endpoint());
+            sendMsg(new_msg(), model_id(), endpoint());
             new_msg.set(String::new());
         }
     };
@@ -321,13 +353,13 @@ pub fn app() -> Element {
                 "data-modal-toggle":"model-config",
                 svg { class: "w-6 h-6 text-gray-800 dark:text-white","aria-hidden":"true","xmlns":"http://www.w3.org/2000/svg",
                     "width":"24","height":"24","fill":"none",
-                    "viewBox":"0 0 24 24", 
-                    path { 
+                    "viewBox":"0 0 24 24",
+                    path {
                         "stroke":"currentColor",
                         "stroke-linecap":"round",
                         "stroke-linejoin":"round",
                         "stroke-width":"2",
-                        "d":"M21 13v-2a1 1 0 0 0-1-1h-.757l-.707-1.707.535-.536a1 1 0 0 0 0-1.414l-1.414-1.414a1 1 0 0 0-1.414 0l-.536.535L14 4.757V4a1 1 0 0 0-1-1h-2a1 1 0 0 0-1 1v.757l-1.707.707-.536-.535a1 1 0 0 0-1.414 0L4.929 6.343a1 1 0 0 0 0 1.414l.536.536L4.757 10H4a1 1 0 0 0-1 1v2a1 1 0 0 0 1 1h.757l.707 1.707-.535.536a1 1 0 0 0 0 1.414l1.414 1.414a1 1 0 0 0 1.414 0l.536-.535 1.707.707V20a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1v-.757l1.707-.708.536.536a1 1 0 0 0 1.414 0l1.414-1.414a1 1 0 0 0 0-1.414l-.535-.536.707-1.707H20a1 1 0 0 0 1-1Z" 
+                        "d":"M21 13v-2a1 1 0 0 0-1-1h-.757l-.707-1.707.535-.536a1 1 0 0 0 0-1.414l-1.414-1.414a1 1 0 0 0-1.414 0l-.536.535L14 4.757V4a1 1 0 0 0-1-1h-2a1 1 0 0 0-1 1v.757l-1.707.707-.536-.535a1 1 0 0 0-1.414 0L4.929 6.343a1 1 0 0 0 0 1.414l.536.536L4.757 10H4a1 1 0 0 0-1 1v2a1 1 0 0 0 1 1h.757l.707 1.707-.535.536a1 1 0 0 0 0 1.414l1.414 1.414a1 1 0 0 0 1.414 0l.536-.535 1.707.707V20a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1v-.757l1.707-.708.536.536a1 1 0 0 0 1.414 0l1.414-1.414a1 1 0 0 0 0-1.414l-.535-.536.707-1.707H20a1 1 0 0 0 1-1Z"
                     }
                     path { "stroke":"currentColor",
                             "stroke-linecap":"round",

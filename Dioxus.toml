@@ -41,3 +41,6 @@ script = ["/sw.js"]
 # Javascript code file
 # serve: [dev-server] only
 script = []
+
+[[web.proxy]]
+backend = "http://127.0.0.1:3081/api/"

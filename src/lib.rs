@@ -6,9 +6,12 @@ pub mod model;
 pub mod llama;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod phi3;
-pub mod apiserver;
 pub mod data;
 pub mod web;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod str_output_stream;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod worker_server;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod master_server;
 

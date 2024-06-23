@@ -7,7 +7,9 @@ use moonweb::web::app;
 use std::str::FromStr;
 
 #[cfg(not(target_arch = "wasm32"))]
-use moonweb::apiserver::{worker_server,master_server};
+use moonweb::master_server::master_server;
+#[cfg(not(target_arch = "wasm32"))]
+use moonweb::worker_server::worker_server;
 
 // Urls are relative to your Cargo.toml file
 const _TAILWIND_URL: &str = manganis::mg!(file("public/tailwind.css"));
