@@ -31,7 +31,7 @@ Welcome to Moonweb, a web chat tool developed with Rust, Dioxus, and Candle fram
 ```
 1. **Run the Web** : Start the web services.
 ```shell
-   dx serve --platform fullstack
+   dx serve
 ```
 **Architecture Overview**
 
