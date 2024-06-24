@@ -24,6 +24,8 @@ eventsource-stream = "0.2.3"
 futures = "0.3.30"
 
 
+
+
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 candle-core = { git = "https://github.com/huggingface/candle.git", version = "0.6.0", features = ["cuda"] }
 candle-transformers = { git = "https://github.com/huggingface/candle.git", version = "0.6.0", features = ["cuda"] }
@@ -42,6 +44,8 @@ signal-hook = "0.3.17"
 ipc-channel = "0.18.1"
 async-stream = "0.3.5"
 tokio-stream = "0.1.15"
+
+
 
 [dev-dependencies]
 clap = "*"

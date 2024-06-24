@@ -15,21 +15,22 @@ Welcome to Moonweb, a web chat tool developed with Rust, Dioxus, and Candle fram
 **Quick Start**
 
 1. **Install Rust**: Ensure that Rust is installed on your system. Visit the [Rust official website](https://www.rust-lang.org/) for installation instructions.
-1. **Install Dioxus**: dioxus is a react and vue like web framework. Visit the [document ](https://dioxuslabs.com/learn/0.5/getting_started)of dioxus.
-1. **Clone the Repository**: Clone the Moonweb project to your local machine using Git.
+2. **Install Dioxus**: dioxus is a react and vue like web framework. Visit the [document ](https://dioxuslabs.com/learn/0.5/getting_started)of dioxus.
+3. **Clone the Repository**: Clone the Moonweb project to your local machine using Git.
 
    git clone https://github.com/ Lyn-liyuan/moonweb.git
 
-1. **Build the Project**: Navigate to the project directory and build the project using Cargo.
-1. cd moonweb
+4. **Build the Project**: Navigate to the project directory and build the project using Cargo.
+   
 ```shell
+   cd moonweb
    cargo build
 ```
-1. **Run the Services**: Start the LLM model services.
+5. **Run the Services**: Start the LLM model services.
 ```shell
    cargo run –-release -- --server master
 ```
-1. **Run the Web** : Start the web services.
+6. **Run the Web** : Start the web services.
 ```shell
    dx serve
 ```
@@ -44,8 +45,12 @@ Welcome to Moonweb, a web chat tool developed with Rust, Dioxus, and Candle fram
 To integrate a new LLM model, follow these steps:
 
 1. Create a model service process that implements ipc_channel communication.
-1. Register the communication interface of the model service in the backend service.
-1. Update the frontend interface to support input and output for the new model.
+2. Edit the server.config file and add the server config to the servers field.
+3. Use web interface send /load model_id to robot.
+
+**Update Records**
+- **June 25, 2024**: Implement dynamic loading of model services. The model service can be an independent program. As long as it complies with the IPC communication specification, the service can be started through the /load model_id command on the web page.
+
 
 **Contributing**
 

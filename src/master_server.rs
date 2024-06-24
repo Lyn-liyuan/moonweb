@@ -8,39 +8,48 @@ use futures::stream::Stream;
 use ipc_channel::ipc::{IpcOneShotServer, IpcReceiver, IpcSender};
 use serde::{Deserialize, Serialize};
 
+use crate::data::Message;
+use axum::{routing::{post,get}, Router};
+use dashmap::DashMap;
 use lazy_static::lazy_static;
 use std::convert::Infallible;
 use std::env;
 use std::fs;
 use std::io::Read;
+use std::path::PathBuf;
+use std::process;
 use std::process::Command;
 use tokio::signal;
 #[cfg(unix)]
 use tokio::signal::unix::SignalKind;
-use crate::data::Message;
-use axum::{routing::post, Router};
-use dashmap::DashMap;
-use std::process;
 use tokio::sync::mpsc::{self, Receiver, Sender};
 use tokio::time::Duration;
+use std::sync::Arc;
+use tokio::sync::RwLock;
 
 lazy_static! {
-    pub static ref WORKER_HUB: DashMap<String, Worker> = DashMap::<String, Worker>::new();
+    static ref WORKER_HUB: DashMap<String, Worker> = DashMap::<String, Worker>::new();
+
+}
+lazy_static! {
+    static ref CONFIG:Arc<RwLock<ServerConfig>> = Arc::new(RwLock::new(load_config()));
 }
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 struct WorkerServer {
     pub model_id: String,
+    pub program: String,
     pub temp: f64,
     pub top_p: f64,
 }
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 struct ServerConfig {
     pub ports: Vec<u32>,
     pub master_addr: String,
-    pub worker_servers: Vec<WorkerServer>,
+    pub working_servers: Vec<WorkerServer>,
+    pub servers: Vec<WorkerServer>,
 }
-#[cfg(not(target_arch = "wasm32"))]
+
 pub struct Worker {
     pub model_id: String,
     pub sender: Sender<(Sender<String>, String)>,
@@ -70,7 +79,7 @@ async fn proxy(
     }
 }
 
-#[cfg(not(target_arch = "wasm32"))]
+
 pub async fn call_worker(
     Json(request): Json<Request>,
 ) -> Sse<impl Stream<Item = Result<Event, Infallible>>> {
@@ -160,54 +169,119 @@ async fn handle_unix_signals() {
     process::exit(0);
 }
 
-#[cfg(not(target_arch = "wasm32"))]
+
 pub async fn master_server() {
+    
+    {
+        for server in CONFIG.read().await.working_servers.iter() {
+            let model_id = &server.model_id;
+            let program = get_program(server);
+            launch_worker(&program, model_id);
+        }
+   }
+    #[cfg(unix)]
+    let rt = tokio::runtime::Runtime::new().expect("Create runtime failed!");
+    #[cfg(unix)]
+    rt.spawn(handle_unix_signals());
+
+    let app = Router::new().route("/api/chat", post(call_worker))
+                           .route("/api/load",post(call_command))
+                           .route("/api/models",get(modal_list));
+    let addr = {CONFIG.read().await.master_addr.clone()};
+    let listener = tokio::net::TcpListener::bind(addr)
+        .await
+        .unwrap();
+    println!("listenning in {}", CONFIG.read().await.master_addr);
+    axum::serve(listener, app).await.unwrap();
+}
+
+fn load_config() -> ServerConfig {
     let mut file = fs::File::open("server.config").expect("Failed to read server.config!");
     let mut contents = String::new();
     file.read_to_string(&mut contents)
         .expect("Failed to read server.config to string!");
     let config =
         serde_json::from_str::<ServerConfig>(contents.as_str()).expect("Failed to deseriablize.");
-    let program = env::current_exe().expect("Failed to determine the current executable path");
+    config
+}
+fn save_config(config:&ServerConfig) {
+    let content = serde_json::to_string_pretty(config).unwrap();
+    fs::write("server.config", content.as_bytes()).unwrap();
+}
 
-    for server in config.worker_servers.iter() {
-        let model_id = &server.model_id;
-        let (one_shot_serv, ipc_name) =
-            IpcOneShotServer::new().expect("Failed to ipc one shot server");
-        let _ = Command::new(program.as_os_str())
-            .arg("--server")
-            .arg("Worker")
-            .arg("--model-id")
-            .arg(model_id.as_str())
-            .arg("--ipc-name")
-            .arg(ipc_name.as_str())
-            .spawn()
-            .expect("Worker server failed to start");
-        let (_, sender): (_, IpcSender<String>) =
-            one_shot_serv.accept().expect("Failed to accept sender!");
-        let (one_shot_serv, ipc_name) = IpcOneShotServer::new().unwrap();
-        sender.send(ipc_name).expect("Failed to send ipc name");
-        let (_, receiver): (_, IpcReceiver<String>) =
-            one_shot_serv.accept().expect("Failed to accept receiver!");
-        let (tx, rx) = mpsc::channel::<(Sender<String>, String)>(100);
-        WORKER_HUB.insert(
-            server.model_id.clone(),
-            Worker {
-                model_id: model_id.clone(),
-                sender: tx,
-            },
-        );
-        tokio::spawn(proxy(sender, receiver, rx));
+fn launch_worker(program: &PathBuf, model_id: &String) {
+    let (one_shot_serv, ipc_name) = IpcOneShotServer::new().expect("Failed to ipc one shot server");
+    let _ = Command::new(program.as_os_str())
+        .arg("--server")
+        .arg("Worker")
+        .arg("--model-id")
+        .arg(model_id.as_str())
+        .arg("--ipc-name")
+        .arg(ipc_name.as_str())
+        .spawn()
+        .expect("Worker server failed to start");
+    let (_, sender): (_, IpcSender<String>) =
+        one_shot_serv.accept().expect("Failed to accept sender!");
+    let (one_shot_serv, ipc_name) = IpcOneShotServer::new().unwrap();
+    sender.send(ipc_name).expect("Failed to send ipc name");
+    let (_, receiver): (_, IpcReceiver<String>) =
+        one_shot_serv.accept().expect("Failed to accept receiver!");
+    let (tx, rx) = mpsc::channel::<(Sender<String>, String)>(100);
+    WORKER_HUB.insert(
+        model_id.clone(),
+        Worker {
+            model_id: model_id.clone(),
+            sender: tx,
+        },
+    );
+    tokio::spawn(proxy(sender, receiver, rx));
+}
+
+pub async fn modal_list() -> Json<Vec<String>> {
+    
+    let list:Vec<String> = CONFIG.read().await.working_servers.iter().map(|serv| serv.model_id.clone()).collect();
+    Json::from(list)
+}
+
+pub async fn call_command(
+    cmd: String,
+) -> String {
+    
+    let commands:Vec<&str> = cmd.split(|c: char| c.is_whitespace()).filter(|&s| !s.is_empty()).collect();
+    if commands.len()> 1 {
+        if commands[0] == "/load" {
+            let model_id = commands[1].to_string();
+            let conofig = {CONFIG.read().await.clone()};
+            match conofig.working_servers.iter().find(|ser| ser.model_id == model_id) {
+                None => {
+                    if let Some(server) = conofig.servers.iter().find(|ser| ser.model_id == model_id) {
+                        let program = get_program(server);
+                        launch_worker(&program, &model_id);
+                        {
+                          let mut new_config = CONFIG.write().await;
+                          new_config.working_servers.push(server.clone());
+                          save_config(&new_config);
+                        }
+                        format!("{} server start!",model_id)
+                    } else {
+                        format!("{} is not exist!",model_id)
+                    }
+                },
+                Some(_) => format!("{} server is runing!",model_id)
+            }
+        } else {
+            format!("Command {} is not exist",commands[0])
+        }
+    } else {
+        format!("{} is error command!",cmd)
     }
-    #[cfg(unix)]
-    let rt = tokio::runtime::Runtime::new().expect("Create runtime failed!");
-    #[cfg(unix)]
-    rt.spawn(handle_unix_signals());
+}
 
-    let app = Router::new().route("/api/chat", post(call_worker));
-    let listener = tokio::net::TcpListener::bind(config.master_addr.clone())
-        .await
-        .unwrap();
-    println!("listenning in {}", config.master_addr);
-    axum::serve(listener, app).await.unwrap();
+fn get_program(server: &WorkerServer) -> PathBuf {
+    let program = if server.program == "self" {
+        env::current_exe().expect("Failed to determine the current executable path")
+    } else {
+        PathBuf::from(server.program.clone())
+    };
+    program
 }

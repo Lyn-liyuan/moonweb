@@ -1,7 +1,7 @@
 #![allow(non_snake_case, unused)]
 extern crate image_base64_wasm;
 //use crate::apiserver::chat_stream;
-use crate::data::{Message, Role};
+use crate::data::{Message, Role, SelectOption};
 use dioxus::prelude::*;
 use dioxus_logger::tracing::{info, Level};
 use futures::StreamExt;
@@ -29,7 +29,7 @@ fn Pulse() -> Element {
 }
 
 #[component]
-fn ModelConfig(model_id: Signal<String>, endpoint: Signal<String>) -> Element {
+fn ModelConfig(model_id: Signal<String>, endpoint: Signal<String>, modelOptions: Signal<Vec<SelectOption>>) -> Element {
     rsx!(
         div {
             "aria-hidden": "true",
@@ -80,17 +80,13 @@ fn ModelConfig(model_id: Signal<String>, endpoint: Signal<String>) -> Element {
                                         model_id.set(value);
                                     },
                                     option { "Select model" }
-
+                                    for model in modelOptions() {
                                     option {
-                                        value: "microsoft/Phi-3-medium-4k-instruct",
-                                        selected: model_id() == "microsoft/Phi-3-medium-4k-instruct",
-                                        "Phi 3"
+                                        value: "{model.value}",
+                                        selected: {model.selected},
+                                        "{model.text}"
                                     }
-                                    option {
-                                        value: "meta-llama/Meta-Llama-3-8B-Instruct",
-                                        selected: model_id() == "meta-llama/Meta-Llama-3-8B-Instruct",
-                                        "Llama 3"
-                                    }
+                                   }
                                 }
                             }
                             div { class: "col-span-2",
@@ -195,7 +191,7 @@ fn ShowMessage(msg: Message) -> Element {
                  }
             }
 
-         } else {
+         } else if msg.role == Role::Robot {
             div { class: "flex mb-4",
                 div { class: "bg-gray-300 p-3 rounded-r-lg rounded-bl-lg",
                     if msg.loading {
@@ -205,86 +201,117 @@ fn ShowMessage(msg: Message) -> Element {
                     }
                 }
             }
+        } else {
+            div { class: "flex mb-4",
+              div { class: "bg-blue-300 p-3 rounded-r-lg rounded-bl-lg",
+                if msg.loading {
+                   Pulse {}
+                } else {
+                   p { dangerous_inner_html: "{html}" }
+                }
+            }
+        }
         }
     )
 }
 
-fn sendMsg(msg: String, model_id: String, url: String) {
+fn sendMsg(msg: String, model_id: String, url: String, mut modelOptions:Signal<Vec<SelectOption>>) {
+    
     if msg != "" {
+        use reqwest::Client;
+
         let mut history = use_context::<Signal<Vec<Message>>>();
         let id = history().len();
+
         history.write().push(Message {
             id: id,
             role: Role::User,
-            content: msg,
+            content: msg.clone(),
             img: None,
             loading: false,
         });
+        
+
         let id = history().len();
-        history.write().push(Message {
-            id: id,
-            role: Role::Robot,
-            content: String::new(),
-            img: None,
-            loading: true,
-        });
-        let history_clone = history.read()[..id].to_owned();
+        if msg.starts_with("/load") {
+            history.write().push(Message {
+                id: id,
+                role: Role::Admin,
+                content: String::new(),
+                img: None,
+                loading: true,
+            });
+            let history_clone = history.read()[..id].to_owned();
+            spawn(async move {
+                let response = Client::new().post(format!("{}load",url)).body(msg).send().await.expect("Failed to post command!");
+                let text = response.text().await.expect("Failed to get text from response!");
+                let mut message = &mut history.write()[id];
+                message.content.push_str(text.as_str());
+                message.loading = false;
+                spawn(async move {
+                    let response = Client::new().get(format!("{}models",url)).send().await.unwrap().json::<Vec<String>>().await.unwrap();
+                    let mut options: Vec<SelectOption> = response.iter().map(|model| SelectOption {text:model.clone(),value:model.clone(),selected:model_id==model.clone()}).collect();
+                    modelOptions.write().clear();
+                    modelOptions.write().append(&mut options);
+                }); 
+            });
 
-        // spawn(async move {
-        //     if let Ok(stream) = chat_stream(history_clone,model_id,url).await {
-        //         let mut history = use_context::<Signal<Vec<Message>>>();
+        } else {
+            
+            history.write().push(Message {
+                id: id,
+                role: Role::Robot,
+                content: String::new(),
+                img: None,
+                loading: true,
+            });
+            let history_clone = history.read()[..id].to_owned();
+            
+            spawn(async move {
+                use crate::data::Request;
+                use eventsource_stream::Eventsource;
+                
+                let mut stream = Client::new()
+                    .post(format!("{}chat",url))
+                    .json(&Request {
+                        cmd: model_id,
+                        msg_list: history_clone,
+                    })
+                    .send()
+                    .await
+                    .unwrap()
+                    .bytes_stream()
+                    .eventsource();
+                let mut history = use_context::<Signal<Vec<Message>>>();
 
-        //         let mut stream = stream.into_inner();
-        //         while let Some(Ok(text)) = futures::StreamExt::next(&mut stream).await {
-        //             let mut message = &mut history.write()[id];
-        //             message.content.push_str(&text);
-        //             message.loading = false;
-        //         }
-
-        //     }
-        // });
-        spawn(async move {
-            use crate::data::Request;
-            use eventsource_stream::Eventsource;
-            use reqwest::Client;
-            let mut stream = Client::new()
-                .post(url)
-                .json(&Request {
-                    cmd: model_id,
-                    msg_list: history_clone,
-                })
-                .send()
-                .await
-                .unwrap()
-                .bytes_stream()
-                .eventsource();
-            let mut history = use_context::<Signal<Vec<Message>>>();
-
-            while let Some(event) = futures::StreamExt::next(&mut stream).await {
-                match event {
-                    Ok(event) => {
-                        if event.data == "[DONE]" {
-                            break;
+                while let Some(event) = futures::StreamExt::next(&mut stream).await {
+                    match event {
+                        Ok(event) => {
+                            if event.data == "[DONE]" {
+                                break;
+                            }
+                            let mut message = &mut history.write()[id];
+                            message.content.push_str(event.data.as_str());
+                            message.loading = false; 
                         }
-                        let mut message = &mut history.write()[id];
-                        message.content.push_str(event.data.as_str());
-                        message.loading = false; 
-                    }
-                    Err(_) => {
-                        panic!("Error in event stream")
+                        Err(_) => {
+                            panic!("Error in event stream")
+                        }
                     }
                 }
-            }
-        });
+            });
+        }
     }
 }
 
 pub fn app() -> Element {
     use_context_provider(|| Signal::new(Vec::<Message>::new()));
     let mut model_id = use_signal(|| String::from("meta-llama/Meta-Llama-3-8B-Instruct"));
-    let mut endpoint = use_signal(|| String::from("http://localhost:8080/api/chat"));
+    let mut endpoint = use_signal(|| String::from("http://localhost:8080/api/"));
     let mut new_msg = use_signal(String::new);
     let mut send_disabled = use_signal(|| false);
+    let mut modelOptions = use_signal(Vec::<SelectOption>::new);
+
     use_effect(move || {
         let messages = use_context::<Signal<Vec<Message>>>();
         if let Some(window) = window() {
@@ -301,16 +328,24 @@ pub fn app() -> Element {
         }
     });
 
+
     let mut messages = use_context::<Signal<Vec<Message>>>();
     let mut send = move || {
         info!("try send message");
         if !send_disabled() {
             send_disabled.set(true);
             info!("send message");
-            sendMsg(new_msg(), model_id(), endpoint());
+            sendMsg(new_msg(), model_id(), endpoint(), modelOptions);
             new_msg.set(String::new());
         }
     };
+    use reqwest::Client;
+    spawn(async move {
+        let response = Client::new().get(format!("{}models",endpoint())).send().await.unwrap().json::<Vec<String>>().await.unwrap();
+        let mut options: Vec<SelectOption> = response.iter().map(|model| SelectOption {text:model.clone(),value:model.clone(),selected:model_id()==model.clone()}).collect();
+        modelOptions.write().clear();
+        modelOptions.write().append(&mut options);
+    });
 
     rsx!(
         div { class: "border-b px-4 py-2 bg-gray-200",
@@ -399,7 +434,7 @@ pub fn app() -> Element {
                 "Send",
             }
         }
-        ModelConfig { model_id, endpoint }
+        ModelConfig { model_id, endpoint, modelOptions }
         script {
             "initFlowbite();"
         }

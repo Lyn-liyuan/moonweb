@@ -1,5 +1,5 @@
 use ipc_channel::ipc::{self, IpcSender, IpcReceiver};
-use crate::data::Request;
+use crate::data::{Request,Role,Message};
 use crate::model::load;
 use std::process;
 
@@ -20,7 +20,7 @@ pub async fn worker_server(ipc_name:String, model_id: String, temp: f64, top_p: 
             if req.cmd.eq("QUIT") {
                 break;
             }
-            let msg_list = req.msg_list;
+            let msg_list: Vec<Message> = req.msg_list.into_iter().filter(|msg|msg.role!=Role::Admin).collect();
             let history =
                 pipeline.messages_chat_template(&msg_list, "You are hulpful AI assistant.");
             let _ = pipeline.run(&sender,history.as_str(), 1000usize).unwrap();    
