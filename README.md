@@ -50,7 +50,7 @@ To integrate a new LLM model, follow these steps:
 
 **Update Records**
 - **June 25, 2024**: Implement dynamic loading of model services. The model service can be an independent program. As long as it complies with the IPC communication specification, the service can be started through the /load model_id command on the web page.
-
+- **July 2, 2024**: Added qwen2 model, supported python as model service, and implemented Qwen/Qwen-7B-Instruct model service with python.
 
 **Contributing**
 
