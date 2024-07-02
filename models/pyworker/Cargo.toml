@@ -1,0 +1,17 @@
+[package]
+name = "pyworker"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+clap = { version = "3.0", features = ["derive"] }
+ipc-channel = "0.18.1"
+pyo3 = "0.21.1"
+
+[build-dependencies]
+pyo3-build-config = { git = "https://github.com/pyo3/pyo3", features = ["resolve-config"] }
+
+
+

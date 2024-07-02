@@ -13,7 +13,7 @@ use model::{Llama, LlamaConfig, Config};
 
 use crate::token_output_stream::TokenOutputStream;
 use crate::model::TextGenModel;
-use crate::str_output_stream::OutputStream;
+use crate::ipc::OutputStream;
 use tokenizers::Tokenizer;
 
 

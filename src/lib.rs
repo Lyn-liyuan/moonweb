@@ -9,7 +9,7 @@ pub mod phi3;
 pub mod data;
 pub mod web;
 #[cfg(not(target_arch = "wasm32"))]
-pub mod str_output_stream;
+pub mod ipc;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod worker_server;
 #[cfg(not(target_arch = "wasm32"))]

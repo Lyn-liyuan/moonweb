@@ -22,16 +22,18 @@ comrak = "0.24"
 web-sys ={ version = "0.3.69", features = ["Window", "Document", "Element"] }
 eventsource-stream = "0.2.3"
 futures = "0.3.30"
+wasm-bindgen = "0.2.92"
+
 
 
 
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-candle-core = { git = "https://github.com/huggingface/candle.git", version = "0.6.0", features = ["cuda"] }
-candle-transformers = { git = "https://github.com/huggingface/candle.git", version = "0.6.0", features = ["cuda"] }
+candle-core = { git = "https://github.com/huggingface/candle.git", features = ["cuda"] }
+candle-transformers = { git = "https://github.com/huggingface/candle.git",  features = ["cuda"] }
 tokenizers = { version = "0.19.1", features = ["onig"] }
 cpal= { version = "0.15.2", optional = true }
-candle-nn = { git = "https://github.com/huggingface/candle.git", version = "0.6.0", features = ["cuda"] }
+candle-nn = { git = "https://github.com/huggingface/candle.git",  features = ["cuda"] }
 csv = "1.3.0"
 cudarc = { optional = true }
 half = { optional = true }
@@ -44,7 +46,6 @@ signal-hook = "0.3.17"
 ipc-channel = "0.18.1"
 async-stream = "0.3.5"
 tokio-stream = "0.1.15"
-
 
 
 [dev-dependencies]

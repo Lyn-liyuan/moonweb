@@ -1,12 +1,13 @@
 #![allow(non_snake_case, unused)]
 extern crate image_base64_wasm;
-//use crate::apiserver::chat_stream;
 use crate::data::{Message, Role, SelectOption};
 use dioxus::prelude::*;
 use dioxus_logger::tracing::{info, Level};
 use futures::StreamExt;
 use serde::{Deserialize, Serialize};
 use web_sys::window;
+
+
 
 #[component]
 fn Pulse() -> Element {
@@ -307,7 +308,7 @@ fn sendMsg(msg: String, model_id: String, url: String, mut modelOptions:Signal<V
 pub fn app() -> Element {
     use_context_provider(|| Signal::new(Vec::<Message>::new()));
     let mut model_id = use_signal(|| String::from("meta-llama/Meta-Llama-3-8B-Instruct"));
-    let mut endpoint = use_signal(|| String::from("http://localhost:8080/api/"));
+    let mut endpoint = use_signal(|| String::from("http://localhost:12020/api/"));
     let mut new_msg = use_signal(String::new);
     let mut send_disabled = use_signal(|| false);
     let mut modelOptions = use_signal(Vec::<SelectOption>::new);

@@ -3,7 +3,7 @@ use core::str;
 use crate::data::Message;
 use crate::llama;
 use anyhow::{Error, Result};
-use crate::str_output_stream::OutputStream;
+use crate::ipc::OutputStream;
 
 
 pub trait TextGenModel {

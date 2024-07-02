@@ -13,7 +13,7 @@ use hf_hub::{api::sync::Api, Repo, RepoType};
 use tokenizers::Tokenizer;
 use crate::model::TextGenModel;
 use crate::data::{Message,Role};
-use crate::str_output_stream::OutputStream;
+use crate::ipc::OutputStream;
 
 
 pub struct TextGeneration {
@@ -53,7 +53,7 @@ impl TextGenModel for TextGeneration {
     
 
     fn run(&mut self,output:&dyn OutputStream, prompt: &str, sample_len: usize) -> Result<(), Error> {
-        use std::io::Write;
+        
         println!("starting the inference loop");
         self.model.clear_kv_cache();
         self.tokenizer.clear();
@@ -71,8 +71,7 @@ impl TextGenModel for TextGeneration {
             Some(token) => token,
             None => anyhow::bail!("cannot find the endoftext token"),
         };
-        print!("{prompt}");
-        std::io::stdout().flush()?;
+        
         let start_gen = std::time::Instant::now();
         let mut pos = 0;
         //let mut content = String::new();

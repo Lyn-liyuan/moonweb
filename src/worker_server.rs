@@ -1,18 +1,14 @@
-use ipc_channel::ipc::{self, IpcSender, IpcReceiver};
+
 use crate::data::{Request,Role,Message};
 use crate::model::load;
+use crate::ipc::accept;
 use std::process;
 
 pub async fn worker_server(ipc_name:String, model_id: String, temp: f64, top_p: f64) {
+    
+    let (receiver, sender) = accept(ipc_name);
+    
     let mut pipeline = load(&model_id, temp, top_p).expect("Failed to load model!");
-    let (client_sender, receiver): (IpcSender<String>, IpcReceiver<String>) = ipc::channel().unwrap();
-    let connector = IpcSender::connect(ipc_name.clone()).expect(format!("Failed to connect {}",ipc_name).as_str());
-    connector.send(client_sender).expect("Failed to send client sender");
-    let (sender, client_receiver): (IpcSender<String>, IpcReceiver<String>) = ipc::channel().unwrap();
-    let client_name = receiver.recv().expect("Failed to recv!");
-    let connector = IpcSender::connect(client_name.clone()).expect(format!("Failed to connect client: {}",client_name).as_str());
-    connector.send(client_receiver).expect("Failed to send client receive");
-
     println!("model {} server start!", model_id);
     loop {
         let request: String = receiver.recv().expect("Failed to recv!");
@@ -28,3 +24,4 @@ pub async fn worker_server(ipc_name:String, model_id: String, temp: f64, top_p: 
     }
     process::exit(0);
 }
+
