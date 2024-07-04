@@ -174,15 +174,19 @@ pub async fn master_server() {
 
 fn launch_worker(program: &PathBuf, model_id: &String) {
     let (one_shot_serv, ipc_name) = IpcOneShotServer::new().expect("Failed to ipc one shot server");
-    let _ = Command::new(program.as_os_str())
+    let e = Command::new(program.as_os_str())
         .arg("--server")
         .arg("Worker")
         .arg("--model-id")
         .arg(model_id.as_str())
         .arg("--ipc-name")
         .arg(ipc_name.as_str())
-        .spawn()
-        .expect(format!("Worker server {} failed to start",model_id).as_str());
+        .spawn();
+    if e.is_err() {
+        println!("Worker server {} failed to start",model_id);
+        return;
+    }
+       
     let (_, sender): (_, IpcSender<String>) =
         one_shot_serv.accept().expect("Failed to accept sender!");
     let (one_shot_serv, ipc_name) = IpcOneShotServer::new().unwrap();
@@ -262,40 +266,4 @@ pub async fn call_command(cmd: String) -> String {
     }
 }
 
-pub async fn call_load(cmd: String) -> String {
-    let commands: Vec<&str> = cmd
-        .split(|c: char| c.is_whitespace())
-        .filter(|&s| !s.is_empty())
-        .collect();
-    if commands.len() > 1 {
-        if commands[0] == "/load" {
-            let model_id = commands[1].to_string();
 
-            match get_working_servers()
-                .await
-                .iter()
-                .find(|ser| ser.model_id == model_id)
-            {
-                None => {
-                    if let Some(server) = get_servers()
-                        .await
-                        .iter()
-                        .find(|ser| ser.model_id == model_id)
-                    {
-                        let program = get_program(server);
-                        launch_worker(&program, &model_id);
-                        new_working_server(server.clone()).await;
-                        format!("{} server start!", model_id)
-                    } else {
-                        format!("{} is not exist!", model_id)
-                    }
-                }
-                Some(_) => format!("{} server is runing!", model_id),
-            }
-        } else {
-            format!("Command {} is not exist", commands[0])
-        }
-    } else {
-        format!("{} is error command!", cmd)
-    }
-}

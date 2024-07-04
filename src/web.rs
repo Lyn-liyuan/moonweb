@@ -275,7 +275,7 @@ fn sendMsg(msg: String, model_id: String, url: String, mut modelOptions:Signal<V
                 let mut stream = Client::new()
                     .post(format!("{}chat",url))
                     .json(&Request {
-                        cmd: model_id,
+                        cmd: model_id.clone(),
                         msg_list: history_clone,
                     })
                     .send()
@@ -284,11 +284,16 @@ fn sendMsg(msg: String, model_id: String, url: String, mut modelOptions:Signal<V
                     .bytes_stream()
                     .eventsource();
                 let mut history = use_context::<Signal<Vec<Message>>>();
-
+                let mut first_event = true;
                 while let Some(event) = futures::StreamExt::next(&mut stream).await {
                     match event {
                         Ok(event) => {
                             if event.data == "[DONE]" {
+                                if first_event {
+                                    let mut message = &mut history.write()[id];
+                                    message.content.push_str(format!("Failed to find {} model server",model_id).as_str());
+                                    message.loading = false; 
+                                }
                                 break;
                             }
                             let mut message = &mut history.write()[id];
@@ -299,6 +304,7 @@ fn sendMsg(msg: String, model_id: String, url: String, mut modelOptions:Signal<V
                             panic!("Error in event stream")
                         }
                     }
+                    first_event = false;
                 }
             });
         }
