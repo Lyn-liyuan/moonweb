@@ -25,18 +25,16 @@ futures = "0.3.30"
 wasm-bindgen = "0.2.92"
 
 
-
-
-
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-candle-core = { git = "https://github.com/huggingface/candle.git", features = ["cuda"] }
-candle-transformers = { git = "https://github.com/huggingface/candle.git",  features = ["cuda"] }
+candle-core = { git = "https://github.com/huggingface/candle.git",  features = ["cuda"] }
+candle-transformers = { git = "https://github.com/huggingface/candle.git", features = ["cuda"] }
+candle-nn = { git = "https://github.com/huggingface/candle.git",features = ["cuda"]}
 tokenizers = { version = "0.19.1", features = ["onig"] }
+
 cpal= { version = "0.15.2", optional = true }
-candle-nn = { git = "https://github.com/huggingface/candle.git",  features = ["cuda"] }
 csv = "1.3.0"
-cudarc = { optional = true }
 half = { optional = true }
+
 hf-hub = { features = ["tokio"] }
 anyhow = "1.0.86"
 tokio = { version = "1.38.0", features = ["full"] }

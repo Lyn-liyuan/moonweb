@@ -13,5 +13,7 @@ pub mod ipc;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod worker_server;
 #[cfg(not(target_arch = "wasm32"))]
+mod master_state;
+#[cfg(not(target_arch = "wasm32"))]
 pub mod master_server;
 

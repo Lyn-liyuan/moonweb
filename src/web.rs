@@ -234,7 +234,7 @@ fn sendMsg(msg: String, model_id: String, url: String, mut modelOptions:Signal<V
         
 
         let id = history().len();
-        if msg.starts_with("/load") {
+        if msg.starts_with("/load") || msg.starts_with("/unload") {
             history.write().push(Message {
                 id: id,
                 role: Role::Admin,
@@ -249,12 +249,12 @@ fn sendMsg(msg: String, model_id: String, url: String, mut modelOptions:Signal<V
                 let mut message = &mut history.write()[id];
                 message.content.push_str(text.as_str());
                 message.loading = false;
-                spawn(async move {
-                    let response = Client::new().get(format!("{}models",url)).send().await.unwrap().json::<Vec<String>>().await.unwrap();
-                    let mut options: Vec<SelectOption> = response.iter().map(|model| SelectOption {text:model.clone(),value:model.clone(),selected:model_id==model.clone()}).collect();
-                    modelOptions.write().clear();
-                    modelOptions.write().append(&mut options);
-                }); 
+                
+                let response = Client::new().get(format!("{}models",url)).send().await.unwrap().json::<Vec<String>>().await.unwrap();
+                let mut options: Vec<SelectOption> = response.iter().map(|model| SelectOption {text:model.clone(),value:model.clone(),selected:model_id==model.clone()}).collect();
+                modelOptions.write().clear();
+                modelOptions.write().append(&mut options);
+                
             });
 
         } else {
@@ -308,7 +308,7 @@ fn sendMsg(msg: String, model_id: String, url: String, mut modelOptions:Signal<V
 pub fn app() -> Element {
     use_context_provider(|| Signal::new(Vec::<Message>::new()));
     let mut model_id = use_signal(|| String::from("meta-llama/Meta-Llama-3-8B-Instruct"));
-    let mut endpoint = use_signal(|| String::from("http://localhost:12020/api/"));
+    let mut endpoint = use_signal(|| String::from("http://localhost:10201/api/"));
     let mut new_msg = use_signal(String::new);
     let mut send_disabled = use_signal(|| false);
     let mut modelOptions = use_signal(Vec::<SelectOption>::new);
