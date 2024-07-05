@@ -13,6 +13,8 @@ use axum::{
     routing::{get, post},
     Router,
 };
+
+use tower_http::services::{ServeDir, ServeFile};
 use dashmap::DashMap;
 use futures::stream::Stream;
 use ipc_channel::ipc::{IpcOneShotServer, IpcReceiver, IpcSender};
@@ -161,11 +163,15 @@ pub async fn master_server() {
     #[cfg(unix)]
     rt.spawn(handle_unix_signals());
 
+    let serve_dir = ServeDir::new("dist").not_found_service(ServeFile::new("dist/index.html"));
+
     let app = Router::new()
         .route("/api/chat", post(call_worker))
         .route("/api/load", post(call_command))
         .route("/api/unload", post(call_command))
-        .route("/api/models", get(modal_list));
+        .route("/api/models", get(modal_list))
+        .nest_service("/", serve_dir.clone())
+        .fallback_service(serve_dir);
     let addr = get_master_addr().await;
     let listener = tokio::net::TcpListener::bind(addr.clone()).await.unwrap();
     println!("listenning in {}", addr);

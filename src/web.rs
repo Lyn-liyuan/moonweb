@@ -5,27 +5,29 @@ use dioxus::prelude::*;
 use dioxus_logger::tracing::{info, Level};
 use futures::StreamExt;
 use serde::{Deserialize, Serialize};
+use wasm_bindgen::JsValue;
 use web_sys::window;
-
+use js_sys::Reflect;
+use wasm_bindgen::prelude::*;
 
 
 #[component]
 fn Pulse() -> Element {
     rsx!(
-     div { class: "border w-80 h-full border-blue-300 shadow rounded-md p-4 max-w-sm mx-auto",
-         div { class: "animate-pulse flex space-x-4",
-             div { class: "flex-1 space-y-6 py-1",
-                 div { class: "h-2 bg-slate-200 rounded" }
-                 div { class: "space-y-3",
-                     div { class: "grid grid-cols-3 gap-4",
-                         div { class: "h-2 bg-slate-200 rounded col-span-2" }
-                         div { class: "h-2 bg-slate-200 rounded col-span-1" }
-                     }
-                     div { class: "h-2 bg-slate-200 rounded" }
-                 }
-             }
-         }
-     }
+        div { class: "border w-80 h-full border-blue-300 shadow rounded-md p-4 max-w-sm mx-auto",
+            div { class: "animate-pulse flex space-x-4",
+                div { class: "flex-1 space-y-6 py-1",
+                    div { class: "h-2 bg-slate-200 rounded" }
+                    div { class: "space-y-3",
+                        div { class: "grid grid-cols-3 gap-4",
+                            div { class: "h-2 bg-slate-200 rounded col-span-2" }
+                            div { class: "h-2 bg-slate-200 rounded col-span-1" }
+                        }
+                        div { class: "h-2 bg-slate-200 rounded" }
+                    }
+                }
+            }
+        }
     )
 }
 
@@ -205,16 +207,18 @@ fn ShowMessage(msg: Message) -> Element {
         } else {
             div { class: "flex mb-4",
               div { class: "bg-blue-300 p-3 rounded-r-lg rounded-bl-lg",
-                if msg.loading {
-                   Pulse {}
-                } else {
-                   p { dangerous_inner_html: "{html}" }
-                }
-            }
+                    if msg.loading {
+                    Pulse {}
+                    } else {
+                    p { dangerous_inner_html: "{html}" }
+                    }
+               }
+           }
         }
-        }
+
     )
 }
+
 
 fn sendMsg(msg: String, model_id: String, url: String, mut modelOptions:Signal<Vec<SelectOption>>) {
     
@@ -258,7 +262,6 @@ fn sendMsg(msg: String, model_id: String, url: String, mut modelOptions:Signal<V
             });
 
         } else {
-            
             history.write().push(Message {
                 id: id,
                 role: Role::Robot,
@@ -313,8 +316,26 @@ fn sendMsg(msg: String, model_id: String, url: String, mut modelOptions:Signal<V
 
 pub fn app() -> Element {
     use_context_provider(|| Signal::new(Vec::<Message>::new()));
+    let href = if let Some(window) = window() {
+        if let Some(document) = window.document() {
+            if let Some(location) = document.location() {
+                Some(format!("{}//{}/api/",location.protocol().unwrap(),location.host().unwrap()))
+            } else {
+                None
+            }   
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+
+    
     let mut model_id = use_signal(|| String::from("meta-llama/Meta-Llama-3-8B-Instruct"));
-    let mut endpoint = use_signal(|| String::from("http://localhost:10201/api/"));
+    let mut endpoint = match href {
+         Some(url) => use_signal(|| String::from(url)),
+         None => use_signal(|| String::from("http://localhost:10201/api/"))
+    };
     let mut new_msg = use_signal(String::new);
     let mut send_disabled = use_signal(|| false);
     let mut modelOptions = use_signal(Vec::<SelectOption>::new);
@@ -331,6 +352,13 @@ pub fn app() -> Element {
                         send_disabled.set(false);
                     }
                 }
+                
+                let hljs = Reflect::get(&window, &JsValue::from_str("hljs")).unwrap();
+                
+                let highlight_all = Reflect::get(&hljs, &JsValue::from_str("highlightAll")).unwrap()
+                    .dyn_into::<js_sys::Function>().unwrap();
+                
+                highlight_all.call0(&JsValue::NULL).unwrap();
             }
         }
     });
@@ -346,13 +374,7 @@ pub fn app() -> Element {
             new_msg.set(String::new());
         }
     };
-    use reqwest::Client;
-    spawn(async move {
-        let response = Client::new().get(format!("{}models",endpoint())).send().await.unwrap().json::<Vec<String>>().await.unwrap();
-        let mut options: Vec<SelectOption> = response.iter().map(|model| SelectOption {text:model.clone(),value:model.clone(),selected:model_id()==model.clone()}).collect();
-        modelOptions.write().clear();
-        modelOptions.write().append(&mut options);
-    });
+   
 
     rsx!(
         div { class: "border-b px-4 py-2 bg-gray-200",
@@ -391,6 +413,15 @@ pub fn app() -> Element {
             }
             button {
                 class: "cursor-pointer bg-gray-300 p-2 mr-4 rounded-lg hover:bg-gray-400",
+                onclick:move |_| {
+                    async move {
+                        use reqwest::Client;
+                        let response = Client::new().get(format!("{}models",endpoint())).send().await.unwrap().json::<Vec<String>>().await.unwrap();
+                        let mut options: Vec<SelectOption> = response.iter().map(|model| SelectOption {text:model.clone(),value:model.clone(),selected:model_id()==model.clone()}).collect();
+                        modelOptions.write().clear();
+                        modelOptions.write().append(&mut options);
+                    }
+                },
                 "data-modal-target":"model-config",
                 "data-modal-toggle":"model-config",
                 svg { class: "w-6 h-6 text-gray-800 dark:text-white","aria-hidden":"true","xmlns":"http://www.w3.org/2000/svg",

@@ -27,12 +27,16 @@ Welcome to Moonweb, a web chat tool developed with Rust, Dioxus, and Candle fram
    cargo build
 ```
 5. **Run the Services**: Start the LLM model services.
+If you want to use the load command to start model services in the models directory, you need to compile these services first. Navigate to the directories containing the Cargo.toml files and execute cargo build --release to compile these services. After the compilation is complete, set the program in the server.config file to the executable file of the compiled model service.
+
+Before compiling the pyworker model service, you need to specify the Python interpreter used by the Python code via the environment variable PYO3_PYTHON. You can activate the Python environment with conda activate my_env and set the environment variable using export PYO3_PYTHON=`which python`.
+
 ```shell
    cargo run –-release -- --server master
 ```
-6. **Run the Web** : Start the web services.
+6. **Build the Web** : Compile rust to WASM.
 ```shell
-   dx serve
+   dx build --release
 ```
 **Architecture Overview**
 
@@ -52,6 +56,7 @@ To integrate a new LLM model, follow these steps:
 - **June 25, 2024**: Implement dynamic loading of model services. The model service can be an independent program. As long as it complies with the IPC communication specification, the service can be started through the /load model_id command on the web page.
 - **July 2, 2024**: Added qwen2 model, supported python as model service, and implemented Qwen/Qwen-7B-Instruct model service with python.
 - **July 4, 2024**: Implement the /unload command to stop the model service process. For example, enter /unload Qwen/Qwen2-1.5B-Instruct in the text box of the web interface to stop the corresponding model process.
+- **July 6, 2024**: To start the HTTP server using axum, you no longer need to use dx serve to start the server. Use the highlight.js library to add syntax highlighting functionality.
 
 **Contributing**
 

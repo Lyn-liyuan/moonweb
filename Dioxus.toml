@@ -18,6 +18,8 @@ asset_dir = "public"
 # HTML title tag content
 title = "moonweb"
 
+
+
 [web.watcher]
 
 # when watcher trigger, regenerate the `index.html`
