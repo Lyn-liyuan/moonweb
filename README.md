@@ -28,9 +28,9 @@ Welcome to Moonweb, a web chat tool developed with Rust, Dioxus, and Candle fram
 ```
 5. **Run the Services**: Start the LLM model services.
 
-If you want to use the load command to start model services in the models directory, you need to compile these services first. Navigate to the directories containing the Cargo.toml files and execute cargo build --release to compile these services. After the compilation is complete, set the program in the server.config file to the executable file of the compiled model service.
+If you want to use the load command to start model services in the models directory, you need to compile these services first. Navigate to the directories containing the Cargo.toml files and execute `cargo build --release` to compile these services. After the compilation is complete, set the program in the server.config file to the executable file of the compiled model service.
 
-Before compiling the pyworker model service, you need to specify the Python interpreter used by the Python code via the environment variable PYO3_PYTHON. You can activate the Python environment with conda activate my_env and set the environment variable using export PYO3_PYTHON=`which python`.
+Before compiling the pyworker model service, you need to specify the Python interpreter used by the Python code via the environment variable PYO3_PYTHON. You can activate the Python environment with `conda activate my_env` and set the environment variable using `export PYO3_PYTHON=$(which python)`.
 
 ```shell
    cargo run –-release -- --server master
