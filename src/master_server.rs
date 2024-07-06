@@ -34,26 +34,32 @@ lazy_static! {
 }
 pub struct Worker {
     pub model_id: String,
-    pub sender: Sender<(Option<Sender<String>>, String)>,
+    pub sender: Sender<(Option<Sender<String>>, Request)>,
 }
 
-async fn proxy(
+async fn modal_actor(
     sender: IpcSender<String>,
     receiver: IpcReceiver<String>,
-    mut rx: Receiver<(Option<Sender<String>>, String)>,
+    mut rx: Receiver<(Option<Sender<String>>, Request)>,
 ) {
     loop {
         if let Some((response_tx, request_data)) = rx.recv().await {
+            let data = serde_json::json!(request_data).to_string();
             sender
-                .send(request_data)
+                .send(data)
                 .expect("Failed to send request to worker process!");
-
+            if request_data.cmd == "QUIT" {
+                break;
+            }
             loop {
-                let response = receiver.recv().expect("Failed to receive from worker");
-                if response == "<|endoftext|>" {
-                    break;
-                }
-                if response_tx.clone().unwrap().send(response).await.is_err() {
+                if let Ok(response) = receiver.recv() {
+                    if response == "<|endoftext|>" {
+                        break;
+                    }
+                    if response_tx.clone().unwrap().send(response).await.is_err() {
+                        break;
+                    }
+                } else {
                     break;
                 }
             }
@@ -73,10 +79,10 @@ pub async fn call_worker(
             cmd: "chat".to_string(),
             msg_list: request.msg_list,
         };
-        let msg = serde_json::json!(req).to_string();
+        
         worker
             .sender
-            .send((Some(response_tx), msg))
+            .send((Some(response_tx), req))
             .await
             .expect("Failed to send to worker");
         Some(response_rx)
@@ -135,12 +141,10 @@ async fn handle_unix_signals() {
             cmd: "QUIT".to_string(),
             msg_list: Vec::<Message>::new(),
         };
-        let msg = serde_json::json!(req).to_string();
-        
 
         let _ = worker
             .sender
-            .send((None, msg))
+            .send((None, req))
             .await
             .is_err_and(|x| {
                 println!("{:?}", x);
@@ -199,7 +203,7 @@ fn launch_worker(program: &PathBuf, model_id: &String) {
     sender.send(ipc_name).expect("Failed to send ipc name");
     let (_, receiver): (_, IpcReceiver<String>) =
         one_shot_serv.accept().expect("Failed to accept receiver!");
-    let (tx, rx) = mpsc::channel::<(Option<Sender<String>>, String)>(100);
+    let (tx, rx) = mpsc::channel::<(Option<Sender<String>>, Request)>(1);
     WORKER_HUB.insert(
         model_id.clone(),
         Worker {
@@ -207,7 +211,7 @@ fn launch_worker(program: &PathBuf, model_id: &String) {
             sender: tx,
         },
     );
-    tokio::spawn(proxy(sender, receiver, rx));
+    tokio::spawn(modal_actor(sender, receiver, rx));
 }
 
 pub async fn modal_list() -> Json<Vec<String>> {
@@ -258,8 +262,7 @@ pub async fn call_command(cmd: String) -> String {
                     cmd: "QUIT".to_string(),
                     msg_list: Vec::<Message>::new(),
                 };
-                let msg = serde_json::json!(req).to_string();
-                server.sender.send((None,msg)).await.unwrap();
+                server.sender.send((None,req)).await.unwrap();
                 remove_working_server(model_id.as_str()).await;
                 format!("{} server stop!", model_id)
             },
