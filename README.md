@@ -10,6 +10,15 @@ Welcome to Moonweb, a web chat tool developed with Rust, Dioxus, and Candle fram
 - **Web Interface**: A responsive and user-friendly web interface built with the Dioxus framework. It supports SSE(Server send event).
 - **Open Source**: Fully open source, encouraging community contributions and customization.
 
+The model services that have been implemented are as follows:
+
+- **meta-llama/Meta-Llama-3-8B-Instruct**
+- **lmms-lab/llama3-llava-next-8b**
+- **Qwen/Qwen2-7B-Instruct**
+- **Qwen/Qwen2-1.5B-Instruct**
+- **microsoft/Phi-3-medium-4k-instruct**
+
+
 [![Moonweb Screen Recording Video](https://github.com/Lyn-liyuan/moonweb/blob/main/youtube--play.jpg?raw=true)](https://youtu.be/AfdswX82FOo "Moonweb Screen Recording Video")
 
 **Quick Start**
@@ -58,6 +67,7 @@ To integrate a new LLM model, follow these steps:
 - **July 2, 2024**: Added qwen2 model, supported python as model service, and implemented Qwen/Qwen-7B-Instruct model service with python.
 - **July 4, 2024**: Implement the /unload command to stop the model service process. For example, enter /unload Qwen/Qwen2-1.5B-Instruct in the text box of the web interface to stop the corresponding model process.
 - **July 6, 2024**: To start the HTTP server using axum, you no longer need to use dx serve to start the server. Use the highlight.js library to add syntax highlighting functionality.
+- **July 11, 2024**: To implement the llava model server.
 
 **Contributing**
 
