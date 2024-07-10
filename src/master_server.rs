@@ -7,6 +7,7 @@ use crate::master_state::{
 use axum::{
     self,
     response::sse::{Event, Sse},
+    extract::DefaultBodyLimit,
     Json,
 };
 use axum::{
@@ -155,13 +156,13 @@ async fn handle_unix_signals() {
 }
 
 pub async fn master_server() {
-    {
-        for server in get_working_servers().await.iter() {
-            let model_id = &server.model_id;
-            let program = get_program(server);
-            launch_worker(&program, model_id);
-        }
+    
+    for server in get_working_servers().await.iter() {
+        let model_id = &server.model_id;
+        let program = get_program(server);
+        launch_worker(&program, model_id);
     }
+    
     #[cfg(unix)]
     let rt = tokio::runtime::Runtime::new().expect("Create runtime failed!");
     #[cfg(unix)]
@@ -174,6 +175,7 @@ pub async fn master_server() {
         .route("/api/load", post(call_command))
         .route("/api/unload", post(call_command))
         .route("/api/models", get(modal_list))
+        .layer(DefaultBodyLimit::disable())
         .nest_service("/", serve_dir.clone())
         .fallback_service(serve_dir);
     let addr = get_master_addr().await;

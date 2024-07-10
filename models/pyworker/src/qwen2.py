@@ -1,4 +1,3 @@
-import argparse
 from moonipc import IpcChannel;
 from transformers import TextStreamer
 from transformers import AutoModelForCausalLM, AutoTokenizer
