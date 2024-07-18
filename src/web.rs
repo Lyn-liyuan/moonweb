@@ -393,7 +393,7 @@ pub fn swtich_session(id: &str, mut model_id: Signal<String>) {
 }
 
 #[component]
-pub fn Conversations(mut model_id: Signal<String>) -> Element {
+pub fn Conversations(mut model_id: Signal<String>,send_disabled: Signal<bool>) -> Element {
     let session = use_context::<Signal<Session>>();
     let session_value = session();
     let mut store = Store::new().unwrap();
@@ -432,7 +432,9 @@ pub fn Conversations(mut model_id: Signal<String>) -> Element {
                                 "aria-current": "page",
                                 class: "inline-flex items-center px-4 py-3 text-white bg-blue-700 rounded-lg active w-full dark:bg-blue-600",
                                 onclick: move |evt| {
-                                    swtich_session(sess.id.as_str(),model_id);
+                                    if !send_disabled() {
+                                      swtich_session(sess.id.as_str(),model_id);
+                                    }
                                 },
                                 "{sess.name}"
                             }
@@ -443,7 +445,9 @@ pub fn Conversations(mut model_id: Signal<String>) -> Element {
                                 href: "#",
                                 class: "inline-flex items-center px-4 py-3 rounded-lg hover:text-gray-900 bg-gray-50 hover:bg-gray-100 w-full dark:bg-gray-800 dark:hover:bg-gray-700 dark:hover:text-white",
                                 onclick: move |evt| {
-                                    swtich_session(sess.id.as_str(),model_id);
+                                    if !send_disabled() {
+                                        swtich_session(sess.id.as_str(),model_id);
+                                    }
                                 },
                                 "{sess.name}"
                             }
@@ -549,7 +553,7 @@ pub fn app() -> Element {
 
     rsx!(
 
-        Conversations { model_id }
+        Conversations { model_id, send_disabled }
 
         div { class: "w-10/12 bg-white shadow-lg rounded-lg overflow-hidden flex flex-col h-5/6",
             div { class: "border-b px-4 py-2 bg-gray-200",
