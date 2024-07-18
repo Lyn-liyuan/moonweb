@@ -16,4 +16,5 @@ pub mod worker_server;
 mod master_state;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod master_server;
+pub mod web_state;
 
