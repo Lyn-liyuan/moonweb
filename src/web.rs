@@ -269,7 +269,7 @@ fn sendMsg(
                 let mut message = &mut history.write()[id];
                 message.content.push_str(text.as_str());
                 message.loading = false;
-
+                
                 let response = Client::new()
                     .get(format!("{}models", url))
                     .send()
@@ -288,6 +288,7 @@ fn sendMsg(
                     .collect();
                 modelOptions.write().clear();
                 modelOptions.write().append(&mut options);
+                send_disabled.set(false);
             });
         } else {
             history.write().push(Message {

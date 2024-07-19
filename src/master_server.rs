@@ -259,14 +259,17 @@ pub async fn call_command(cmd: String) -> String {
             },
             "/unload" => {
                 let model_id = commands[1].to_string();
-                let (_,server) = WORKER_HUB.remove(model_id.as_str()).unwrap();
-                let req = Request {
-                    cmd: "QUIT".to_string(),
-                    msg_list: Vec::<Message>::new(),
-                };
-                server.sender.send((None,req)).await.unwrap();
-                remove_working_server(model_id.as_str()).await;
-                format!("{} server stop!", model_id)
+                if let Some((_,server)) = WORKER_HUB.remove(model_id.as_str()) {
+                    let req = Request {
+                        cmd: "QUIT".to_string(),
+                        msg_list: Vec::<Message>::new(),
+                    };
+                    server.sender.send((None,req)).await.unwrap();
+                    remove_working_server(model_id.as_str()).await;
+                    format!("{} server stop!", model_id)
+                } else {
+                    format!("{} server is not runing", model_id)
+                }
             },
             _ => {
                 format!("Command {} is not exist", commands[0])
