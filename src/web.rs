@@ -35,8 +35,8 @@ fn Pulse() -> Element {
 #[component]
 fn ModelConfig(
     model_id: Signal<String>,
-    endpoint: Signal<String>,
     modelOptions: Signal<Vec<SelectOption>>,
+    system_prompt: Signal<String>,
 ) -> Element {
     rsx!(
         div {
@@ -99,63 +99,6 @@ fn ModelConfig(
                             }
                             div { class: "col-span-2",
                                 label {
-                                    r#for: "url",
-                                    class: "block mb-2 text-sm font-medium text-gray-900 dark:text-white",
-                                    "Backend URL"
-                                }
-                                input {
-                                    r#type: "text",
-                                    step: "0.1",
-                                    required: "",
-                                    placeholder: "Backend URL",
-                                    name: "url",
-                                    class: "bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-primary-600 focus:border-primary-600 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white dark:focus:ring-primary-500 dark:focus:border-primary-500",
-                                    id: "url",
-                                    value:"{endpoint}",
-                                    onchange: move |event| {
-                                        let value = event.value();
-                                        endpoint.set(value);
-                                    },
-                                }
-                            }
-                            div { class: "col-span-2",
-                                label {
-                                    r#for: "temp",
-                                    class: "block mb-2 text-sm font-medium text-gray-900 dark:text-white",
-                                    "Temperature"
-                                }
-                                input {
-                                    r#type: "number",
-                                    step: "0.1",
-                                    required: "",
-                                    min: "0",
-                                    placeholder: "Temperature",
-                                    name: "temp",
-                                    max: "1",
-                                    class: "bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-primary-600 focus:border-primary-600 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white dark:focus:ring-primary-500 dark:focus:border-primary-500",
-                                    id: "temp"
-                                }
-                            }
-                            div { class: "col-span-2",
-                                label {
-                                    r#for: "top_p",
-                                    class: "block mb-2 text-sm font-medium text-gray-900 dark:text-white",
-                                    "Top P"
-                                }
-                                input {
-                                    required: "",
-                                    min: "0",
-                                    max: "1",
-                                    r#type: "number",
-                                    placeholder: "Top P",
-                                    name: "top_p",
-                                    step: "0.1",
-                                    class: "bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-primary-600 focus:border-primary-600 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white dark:focus:ring-primary-500 dark:focus:border-primary-500",
-                                    id: "top_p"
-                                }
-                            }
-                            div { class: "col-span-2",
-                                label {
                                     r#for: "description",
                                     class: "block mb-2 text-sm font-medium text-gray-900 dark:text-white",
                                     "System prompt"
@@ -164,7 +107,12 @@ fn ModelConfig(
                                     rows: "4",
                                     placeholder: "Write System Prompt",
                                     class: "block p-2.5 w-full text-sm text-gray-900 bg-gray-50 rounded-lg border border-gray-300 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500",
-                                    id: "description"
+                                    id: "description",
+                                    onchange: move |evt| {
+                                        let value = evt.value();
+                                        system_prompt.set(value);
+                                    },
+                                    "{system_prompt}"
                                 }
                             }
                         }
@@ -228,6 +176,7 @@ fn sendMsg(
     msg: String,
     model_id: String,
     url: String,
+    system_prompt: String,
     mut modelOptions: Signal<Vec<SelectOption>>,
     mut send_disabled: Signal<bool>,
 ) {
@@ -308,6 +257,7 @@ fn sendMsg(
                     .post(format!("{}chat", url))
                     .json(&Request {
                         cmd: model_id.clone(),
+                        system_prompt: system_prompt,
                         msg_list: history_clone,
                     })
                     .send()
@@ -349,7 +299,7 @@ fn sendMsg(
     }
 }
 
-pub fn swtich_session(id: &str, mut model_id: Signal<String>) {
+pub fn swtich_session(id: &str, mut model_id: Signal<String>,mut system_prompt: Signal<String>) {
     let mut session = use_context::<Signal<Session>>();
     let session_value = session();
     let current_id = session_value.id.clone();
@@ -367,34 +317,35 @@ pub fn swtich_session(id: &str, mut model_id: Signal<String>) {
             session.set(Session {
                 id: new_session.id,
                 name: new_session.name,
-                temp: new_session.temp,
                 mode_id: new_session.mode_id.clone(),
-                top_p: new_session.top_p,
+                system_prompt: new_session.system_prompt.clone(),
                 history: if let Some(ref history) = new_session.history {
                     Some(history.clone())
                 } else {
                     None
                 },
             });
-            model_id.set(new_session.mode_id)
+            info!(new_session.system_prompt);
+            model_id.set(new_session.mode_id);
+            system_prompt.set(new_session.system_prompt);
         } else {
             messages.set(Vec::<Message>::new());
             let new_session = temp_session.read();
             session.set(Session {
                 id: new_session.id.clone(),
                 name: new_session.name.clone(),
-                temp: new_session.temp,
                 mode_id: new_session.mode_id.clone(),
-                top_p: new_session.top_p,
+                system_prompt: new_session.system_prompt.clone(),
                 history: Some(Vec::<Message>::new()),
             });
             model_id.set(new_session.mode_id.clone());
+            system_prompt.set(new_session.system_prompt.clone());
         }
     }
 }
 
 #[component]
-pub fn Conversations(mut model_id: Signal<String>,send_disabled: Signal<bool>) -> Element {
+pub fn Conversations(mut model_id: Signal<String>, mut system_prompt: Signal<String>, send_disabled: Signal<bool>) -> Element {
     let session = use_context::<Signal<Session>>();
     let session_value = session();
     let mut store = Store::new().unwrap();
@@ -409,9 +360,8 @@ pub fn Conversations(mut model_id: Signal<String>,send_disabled: Signal<bool>) -
             session_list.push(Session {
                 id: temp_session.read().id.clone(),
                 name: temp_session.read().name.clone(),
-                temp: temp_session.read().temp,
                 mode_id: temp_session.read().mode_id.clone(),
-                top_p: temp_session.read().top_p,
+                system_prompt: temp_session.read().system_prompt.clone(), 
                 history: Some(Vec::<Message>::new()),
             })
         }
@@ -434,7 +384,7 @@ pub fn Conversations(mut model_id: Signal<String>,send_disabled: Signal<bool>) -
                                 class: "inline-flex items-center px-4 py-3 text-white bg-blue-700 rounded-lg active w-full dark:bg-blue-600",
                                 onclick: move |evt| {
                                     if !send_disabled() {
-                                      swtich_session(sess.id.as_str(),model_id);
+                                      swtich_session(sess.id.as_str(),model_id,system_prompt);
                                     }
                                 },
                                 "{sess.name}"
@@ -447,7 +397,7 @@ pub fn Conversations(mut model_id: Signal<String>,send_disabled: Signal<bool>) -
                                 class: "inline-flex items-center px-4 py-3 rounded-lg hover:text-gray-900 bg-gray-50 hover:bg-gray-100 w-full dark:bg-gray-800 dark:hover:bg-gray-700 dark:hover:text-white",
                                 onclick: move |evt| {
                                     if !send_disabled() {
-                                        swtich_session(sess.id.as_str(),model_id);
+                                        swtich_session(sess.id.as_str(),model_id,system_prompt);
                                     }
                                 },
                                 "{sess.name}"
@@ -496,6 +446,7 @@ pub fn app() -> Element {
         Some(url) => use_signal(|| String::from(url)),
         None => use_signal(|| String::from("http://localhost:10201/api/")),
     };
+    let mut system_prompt = use_signal(|| String::from("You are helpful assistant!"));
     let mut new_msg = use_signal(String::new);
     let mut send_disabled = use_signal(|| false);
     let mut modelOptions = use_signal(Vec::<SelectOption>::new);
@@ -518,6 +469,7 @@ pub fn app() -> Element {
                             let mut sess = session.write();
                             sess.mode_id = model_id();
                             sess.history = Some(messages().clone());
+                            sess.system_prompt = system_prompt();
                             store.save_session(&sess);
                         }
                     }
@@ -545,6 +497,7 @@ pub fn app() -> Element {
                 new_msg(),
                 model_id(),
                 endpoint(),
+                system_prompt(),
                 modelOptions,
                 send_disabled,
             );
@@ -554,7 +507,7 @@ pub fn app() -> Element {
 
     rsx!(
 
-        Conversations { model_id, send_disabled }
+        Conversations { model_id, system_prompt, send_disabled }
 
         div { class: "w-10/12 bg-white shadow-lg rounded-lg overflow-hidden flex flex-col h-5/6",
             div { class: "border-b px-4 py-2 bg-gray-200",
@@ -675,7 +628,7 @@ pub fn app() -> Element {
                 }
             }
         }
-        ModelConfig { model_id, endpoint, modelOptions }
+        ModelConfig { model_id, modelOptions, system_prompt }
         script {
             "initFlowbite();"
         }

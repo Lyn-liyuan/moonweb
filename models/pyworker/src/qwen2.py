@@ -35,7 +35,7 @@ def run(ipc_name,model_id):
         
         if request['cmd'] == "QUIT":
             break
-        messages = [{"role": "system", "content": "你是源胖子训练的中文人工智能助手，你善于简短准确地回答各种问题。"}]
+        messages = [{"role": "system", "content": request['system_prompt']}]
         for msg in request['msg_list'] :
             if msg['role']=='User':
                messages.append({"role":"user","content":msg['content']})

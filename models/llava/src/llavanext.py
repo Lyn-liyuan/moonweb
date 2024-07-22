@@ -37,7 +37,6 @@ def run(ipc_name,model_id = "lmms-lab/llama3-llava-next-8b"):
     conv_template = "llava_llama_3"
 
     conv = copy.deepcopy(conv_templates[conv_template])
-    conv.system = "你是一个有用的中文和视觉助手。" "你能够理解用户提供的视觉内容，" "并使用自然语言协助用户完成各种任务。"
     
     print(f"{model_id} server start!")
     while True:
@@ -45,6 +44,7 @@ def run(ipc_name,model_id = "lmms-lab/llama3-llava-next-8b"):
         
         if request['cmd'] == "QUIT":
             break
+        conv.system = request['system_prompt']
         conv.messages.clear()
         image_list = []
         has_image = False

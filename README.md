@@ -69,6 +69,7 @@ To integrate a new LLM model, follow these steps:
 - **July 6, 2024**: To start the HTTP server using axum, you no longer need to use dx serve to start the server. Use the highlight.js library to add syntax highlighting functionality.
 - **July 11, 2024**: To implement the llava model server.
 - **July 19, 2024**: Added conversation management, using the browser local storage to store historical conversations.
+- **July 23, 2024**: Remove temperature and top_p configuration from the configuration dialog, so that each session can configure its own system prompts.
 
 **Contributing**
 

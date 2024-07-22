@@ -78,6 +78,7 @@ pub async fn call_worker(
         let (response_tx, response_rx) = mpsc::channel::<String>(1);
         let req = Request {
             cmd: "chat".to_string(),
+            system_prompt: request.system_prompt,
             msg_list: request.msg_list,
         };
         
@@ -140,6 +141,7 @@ async fn handle_unix_signals() {
         let worker = kv.value_mut();
         let req = Request {
             cmd: "QUIT".to_string(),
+            system_prompt:"".to_string(),
             msg_list: Vec::<Message>::new(),
         };
 
@@ -262,6 +264,7 @@ pub async fn call_command(cmd: String) -> String {
                 if let Some((_,server)) = WORKER_HUB.remove(model_id.as_str()) {
                     let req = Request {
                         cmd: "QUIT".to_string(),
+                        system_prompt: "".to_string(),
                         msg_list: Vec::<Message>::new(),
                     };
                     server.sender.send((None,req)).await.unwrap();

@@ -8,8 +8,7 @@ pub struct Session {
     pub id: String,
     pub name: String,
     pub mode_id: String,
-    pub temp: Option<f64>,
-    pub top_p: Option<f64>,
+    pub system_prompt: String,
     pub history: Option<Vec<Message>>,
 }
 
@@ -17,8 +16,7 @@ pub struct TempSession {
     pub id: String,
     pub name: String,
     pub mode_id: String,
-    pub temp: Option<f64>,
-    pub top_p: Option<f64>,
+    pub system_prompt: String,
 }
 
 impl TempSession {
@@ -27,8 +25,7 @@ impl TempSession {
             id: session.id.clone(),
             name: session.name.clone(),
             mode_id: session.mode_id.clone(),
-            temp: session.temp,
-            top_p: session.top_p,
+            system_prompt:session.system_prompt.clone(),
         }
     }
 }
@@ -67,8 +64,7 @@ impl Store {
         let session = Session {
             id: id.clone(),
             name: format!("conv {}",no),
-            temp: Some(0.6f64),
-            top_p: Some(0.9f64),
+            system_prompt:"".to_string(),
             mode_id: "meta-llama/Meta-Llama-3-8B-Instruct".to_string(),
             history: None,
         };

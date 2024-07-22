@@ -71,6 +71,7 @@ fn main() {
     let code = include_str!("qwen2.py");
     pyo3::append_to_inittab!(moonipc);
     pyo3::prepare_freethreaded_python();
+    
     let args=(ipc_name.as_str(),model_id.as_str());
     Python::with_gil(|py| {
         let activators = PyModule::from_code_bound(py,code,"qwen.py","qwen").unwrap();

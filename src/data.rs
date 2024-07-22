@@ -19,6 +19,7 @@ pub struct Message {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Request {
     pub cmd:String,
+    pub system_prompt:String,
     pub msg_list:Vec<Message>,
 }
 
