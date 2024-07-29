@@ -17,4 +17,4 @@ mod master_state;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod master_server;
 pub mod web_state;
-
+pub mod authorization;

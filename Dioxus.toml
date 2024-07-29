@@ -36,7 +36,7 @@ watch_path = ["src", "public"]
 style = ["/tailwind.css"]
 
 # Javascript code file
-script = ["/sw.js"]
+script = ["/sw.js","/login.js"]
 
 [web.resource.dev]
 

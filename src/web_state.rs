@@ -1,7 +1,8 @@
 use crate::data::Message;
 use dioxus::prelude::*;
 use serde::{Deserialize, Serialize};
-use web_sys::{window,Storage};
+use js_sys::Date;
+use web_sys::{window, Storage};
 
 #[derive(Props, Clone, PartialEq, Debug, Serialize, Deserialize)]
 pub struct Session {
@@ -20,12 +21,12 @@ pub struct TempSession {
 }
 
 impl TempSession {
-    pub fn new(session:&Session) ->TempSession {
+    pub fn new(session: &Session) -> TempSession {
         TempSession {
             id: session.id.clone(),
             name: session.name.clone(),
             mode_id: session.mode_id.clone(),
-            system_prompt:session.system_prompt.clone(),
+            system_prompt: session.system_prompt.clone(),
         }
     }
 }
@@ -51,7 +52,10 @@ impl Store {
                 let list = Vec::<String>::new();
                 list
             };
-            let store = Store { local_storage, session_list };
+            let store = Store {
+                local_storage,
+                session_list,
+            };
             Some(store)
         } else {
             None
@@ -59,12 +63,12 @@ impl Store {
     }
 
     pub fn new_session(&mut self) -> Session {
-        let no = self.session_list.len();
-        let id = format!("id_{}_",no);
+        let time = Date::new_0();
+        let id = format!("id_{}_", Date::now());
         let session = Session {
             id: id.clone(),
-            name: format!("conv {}",no),
-            system_prompt:"".to_string(),
+            name: format!("{}/{}/{} {}:{}", time.get_full_year()-2000,time.get_month()+1,time.get_date(),time.get_hours(),time.get_minutes()),
+            system_prompt: "".to_string(),
             mode_id: "meta-llama/Meta-Llama-3-8B-Instruct".to_string(),
             history: None,
         };
@@ -82,30 +86,37 @@ impl Store {
         let value = binding.as_str();
         self.local_storage.set_item(id.as_str(), value).unwrap();
         if !exist {
-           self.session_list.push(id.clone());
-           self.local_storage.set_item("session_list", serde_json::json!(self.session_list).to_string().as_str()).expect("Failed to save list!");
+            self.session_list.push(id.clone());
+            self.local_storage
+                .set_item(
+                    "session_list",
+                    serde_json::json!(self.session_list).to_string().as_str(),
+                )
+                .expect("Failed to save list!");
         }
     }
 
-    pub fn fetch_all_session(&mut self)->Vec<Session> {
+    pub fn fetch_all_session(&mut self) -> Vec<Session> {
         let list = self.session_list.clone();
-        list.iter().map(|id|  {
-            let session = if let Ok(Some(value)) = self.local_storage.get_item(id) {
-                if let Ok(sess) = serde_json::from_str::<Session>(value.as_str()){
-                    sess
+        list.iter()
+            .map(|id| {
+                let session = if let Ok(Some(value)) = self.local_storage.get_item(id) {
+                    if let Ok(sess) = serde_json::from_str::<Session>(value.as_str()) {
+                        sess
+                    } else {
+                        self.new_session()
+                    }
                 } else {
                     self.new_session()
-                }
-            } else {
-                self.new_session()
-            };
-            session
-        }).collect()
+                };
+                session
+            })
+            .collect()
     }
 
-    pub fn get_session(&self,id:&str)-> Option<Session> {
+    pub fn get_session(&self, id: &str) -> Option<Session> {
         let session = if let Ok(Some(value)) = self.local_storage.get_item(id) {
-            if let Ok(sess) = serde_json::from_str::<Session>(value.as_str()){
+            if let Ok(sess) = serde_json::from_str::<Session>(value.as_str()) {
                 Some(sess)
             } else {
                 None
@@ -114,5 +125,20 @@ impl Store {
             None
         };
         session
+    }
+
+    pub fn remove_session(&mut self, id: &str) -> Result<(), &'static str> {
+        if let Ok(()) = self.local_storage.delete(id) {
+            self.session_list.retain(|sid| sid != id);
+            self.local_storage
+                .set_item(
+                    "session_list",
+                    serde_json::json!(self.session_list).to_string().as_str(),
+                )
+                .expect("Failed to save list!");
+            Ok(())
+        } else {
+            Err("delete failed!")
+        }
     }
 }

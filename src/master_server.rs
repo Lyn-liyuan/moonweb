@@ -1,25 +1,25 @@
-use crate::data::Message;
-use crate::data::Request;
+use crate::data::{AuthRequest, AuthResponse, Message, Request, Role};
+
 use crate::master_state::{
     get_master_addr, get_program, get_servers, get_working_servers, new_working_server,
     remove_working_server,
 };
 use axum::{
     self,
-    response::sse::{Event, Sse},
     extract::DefaultBodyLimit,
-    Json,
-};
-use axum::{
+    response::sse::{Event, Sse},
     routing::{get, post},
-    Router,
+    Json, Router,
 };
 
-use tower_http::services::{ServeDir, ServeFile};
+use axum_auth::AuthBearer;
+
+use chrono::{Datelike, Utc};
 use dashmap::DashMap;
 use futures::stream::Stream;
 use ipc_channel::ipc::{IpcOneShotServer, IpcReceiver, IpcSender};
 use lazy_static::lazy_static;
+use sqids::Sqids;
 use std::convert::Infallible;
 use std::path::PathBuf;
 use std::process;
@@ -29,6 +29,12 @@ use tokio::signal;
 use tokio::signal::unix::SignalKind;
 use tokio::sync::mpsc::{self, Receiver, Sender};
 use tokio::time::Duration;
+use tower_http::services::{ServeDir, ServeFile};
+
+const SQIDS_ALPHABET: &str = "VRHIrU2je0gxcSGlzvMWBAkpufqDiyEoY931JLTC5wN6KbaQFPOdsXn48h7mZt";
+const ADMIN_TOKEN: &str = "5bfc427e-c7ca-4612-a445-76d7d14edede";
+const USER_TOKEN: &str = "d272c71d-3579-4c85-b6cd-1f144190c98a";
+const SALT: &str = "Akpu#fqDiy@EoY931J_VRHIrU2";
 
 lazy_static! {
     static ref WORKER_HUB: DashMap<String, Worker> = DashMap::<String, Worker>::new();
@@ -69,25 +75,29 @@ async fn modal_actor(
 }
 
 pub async fn call_worker(
+    AuthBearer(token): AuthBearer,
     Json(request): Json<Request>,
 ) -> Sse<impl Stream<Item = Result<Event, Infallible>>> {
     println!("call_worker!! {}", request.cmd);
     let model_id = request.cmd;
 
-    let mut receiver = if let Some(worker) = WORKER_HUB.get(&model_id) {
-        let (response_tx, response_rx) = mpsc::channel::<String>(1);
-        let req = Request {
-            cmd: "chat".to_string(),
-            system_prompt: request.system_prompt,
-            msg_list: request.msg_list,
-        };
-        
-        worker
-            .sender
-            .send((Some(response_tx), req))
-            .await
-            .expect("Failed to send to worker");
-        Some(response_rx)
+    let mut receiver = if valid_token(token.as_str()) {
+        if let Some(worker) = WORKER_HUB.get(&model_id) {
+            let (response_tx, response_rx) = mpsc::channel::<String>(1);
+            let req = Request {
+                cmd: "chat".to_string(),
+                system_prompt: request.system_prompt,
+                msg_list: request.msg_list,
+            };
+            worker
+                .sender
+                .send((Some(response_tx), req))
+                .await
+                .expect("Failed to send to worker");
+            Some(response_rx)
+        } else {
+            None
+        }
     } else {
         None
     };
@@ -97,7 +107,7 @@ pub async fn call_worker(
         match receiver {
                 Some(ref mut rx)=> loop {
                      let msg = match rx.recv().await {
-                        Some(text) => Some(text),
+                        Some(text) => Event::default().data(text),
                         None => {
                             break;
                         }
@@ -106,15 +116,11 @@ pub async fn call_worker(
                 },
                 None => loop {
                     println!("worker is None!!!!");
-                    yield None;
+                    yield Event::default().data("[DONE]");
                     break;
                 }
         }
     }
-    .map(|msg| match msg {
-        Some(text) => Event::default().data(text),
-        None => Event::default().data("[DONE]"),
-    })
     .map(Ok);
 
     Sse::new(stream).keep_alive(
@@ -141,30 +147,25 @@ async fn handle_unix_signals() {
         let worker = kv.value_mut();
         let req = Request {
             cmd: "QUIT".to_string(),
-            system_prompt:"".to_string(),
+            system_prompt: "".to_string(),
             msg_list: Vec::<Message>::new(),
         };
 
-        let _ = worker
-            .sender
-            .send((None, req))
-            .await
-            .is_err_and(|x| {
-                println!("{:?}", x);
-                process::exit(0)
-            });
+        let _ = worker.sender.send((None, req)).await.is_err_and(|x| {
+            println!("{:?}", x);
+            process::exit(0)
+        });
     }
     process::exit(0);
 }
 
 pub async fn master_server() {
-    
     for server in get_working_servers().await.iter() {
         let model_id = &server.model_id;
         let program = get_program(server);
         launch_worker(&program, model_id);
     }
-    
+
     #[cfg(unix)]
     let rt = tokio::runtime::Runtime::new().expect("Create runtime failed!");
     #[cfg(unix)]
@@ -175,8 +176,9 @@ pub async fn master_server() {
     let app = Router::new()
         .route("/api/chat", post(call_worker))
         .route("/api/load", post(call_command))
-        .route("/api/unload", post(call_command))
+        
         .route("/api/models", get(modal_list))
+        .route("/api/signin", post(signin))
         .layer(DefaultBodyLimit::disable())
         .nest_service("/", serve_dir.clone())
         .fallback_service(serve_dir);
@@ -197,10 +199,10 @@ fn launch_worker(program: &PathBuf, model_id: &String) {
         .arg(ipc_name.as_str())
         .spawn();
     if e.is_err() {
-        println!("Worker server {} failed to start",model_id);
+        println!("Worker server {} failed to start", model_id);
         return;
     }
-       
+
     let (_, sender): (_, IpcSender<String>) =
         one_shot_serv.accept().expect("Failed to accept sender!");
     let (one_shot_serv, ipc_name) = IpcOneShotServer::new().unwrap();
@@ -227,7 +229,98 @@ pub async fn modal_list() -> Json<Vec<String>> {
     Json::from(list)
 }
 
-pub async fn call_command(cmd: String) -> String {
+fn get_expire() -> String {
+    let now = Utc::now().date_naive();
+    let one_month_later = now + chrono::Duration::days(30);
+    let sqids = Sqids::builder()
+        .alphabet(SQIDS_ALPHABET.chars().collect())
+        .build()
+        .unwrap();
+    let expire_raw = [
+        one_month_later.year() as u64,
+        one_month_later.month() as u64,
+        one_month_later.day() as u64,
+    ];
+    sqids.encode(&expire_raw).unwrap()
+}
+
+fn valid_token(token: &str) -> bool {
+    if token
+        == format!(
+            "{:x}",
+            md5::compute(format!("{}{}", SALT, USER_TOKEN).as_bytes())
+        )
+        || token
+            == format!(
+                "{:x}",
+                md5::compute(format!("{}{}", SALT, ADMIN_TOKEN).as_bytes())
+            )
+    {
+        true
+    } else {
+        false
+    }
+}
+
+fn valid_admin_token(token: &str) -> bool {
+    if token
+        == format!(
+            "{:x}",
+            md5::compute(format!("{}{}", SALT, ADMIN_TOKEN).as_bytes())
+        )
+    {
+        true
+    } else {
+        false
+    }
+}
+
+pub async fn signin(Json(request): Json<AuthRequest>) -> Json<AuthResponse> {
+    let response_of_failed = AuthResponse {
+        success: false,
+        auth_key: String::new(),
+        expire: String::new(),
+    };
+    let response = match request.role {
+        Role::User => {
+            if request.token
+                == format!(
+                    "{:x}",
+                    md5::compute(format!("{}{}", SALT, USER_TOKEN).as_bytes())
+                )
+            {
+                AuthResponse {
+                    success: true,
+                    auth_key: request.token,
+                    expire: get_expire(),
+                }
+            } else {
+                response_of_failed
+            }
+        }
+        Role::Administrator => {
+            if request.token
+                == format!(
+                    "{:x}",
+                    md5::compute(format!("{}{}", SALT, ADMIN_TOKEN).as_bytes())
+                )
+            {
+                AuthResponse {
+                    success: true,
+                    auth_key: request.token,
+                    expire: get_expire(),
+                }
+            } else {
+                response_of_failed
+            }
+        }
+        Role::Robot => response_of_failed,
+    };
+    Json::from(response)
+}
+
+pub async fn call_command(AuthBearer(token): AuthBearer,cmd: String) -> String {
+    if valid_admin_token(token.as_str()) {
     let commands: Vec<&str> = cmd
         .split(|c: char| c.is_whitespace())
         .filter(|&s| !s.is_empty())
@@ -258,22 +351,22 @@ pub async fn call_command(cmd: String) -> String {
                     }
                     Some(_) => format!("{} server is runing!", model_id),
                 }
-            },
+            }
             "/unload" => {
                 let model_id = commands[1].to_string();
-                if let Some((_,server)) = WORKER_HUB.remove(model_id.as_str()) {
+                if let Some((_, server)) = WORKER_HUB.remove(model_id.as_str()) {
                     let req = Request {
                         cmd: "QUIT".to_string(),
                         system_prompt: "".to_string(),
                         msg_list: Vec::<Message>::new(),
                     };
-                    server.sender.send((None,req)).await.unwrap();
+                    server.sender.send((None, req)).await.unwrap();
                     remove_working_server(model_id.as_str()).await;
                     format!("{} server stop!", model_id)
                 } else {
                     format!("{} server is not runing", model_id)
                 }
-            },
+            }
             _ => {
                 format!("Command {} is not exist", commands[0])
             }
@@ -281,6 +374,7 @@ pub async fn call_command(cmd: String) -> String {
     } else {
         format!("{} is error command!", cmd)
     }
+   } else {
+        String::from("Authentication failed. Only administrators can execute commands.")
+   }
 }
-
-

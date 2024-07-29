@@ -19,12 +19,17 @@ structopt = "0.3"
 clap = { version = "3.0", features = ["derive"] }
 lazy_static = "1.4"
 comrak = "0.24"
-web-sys ={ version = "0.3.69", features = ["Window", "Document", "Element"] }
+web-sys ={ version = "0.3.69", features = ["Window", "Document", "Element","HtmlInputElement"] }
 eventsource-stream = "0.2.3"
 futures = "0.3.30"
 wasm-bindgen = "0.2.92"
 js-sys = "0.3.69"
-
+sqids = "0.4.1"
+md5 = "0.7.0"
+chrono = "0.4.38"
+headers = "0.4.0"
+axum-extra = { version = "0.9.3",features = ["typed-header"]}
+axum-auth = "0.7.0"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 candle-core = { git = "https://github.com/huggingface/candle.git",  features = ["cuda"] }

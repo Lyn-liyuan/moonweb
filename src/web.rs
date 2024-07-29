@@ -1,8 +1,9 @@
 #![allow(non_snake_case, unused)]
 extern crate image_base64_wasm;
 
-use crate::data::{Message, Role, SelectOption};
+use crate::data::{Message, Role, SelectOption, WebUser};
 use crate::web_state::{Session, Store, TempSession};
+use crate::authorization::{LoginBox,get_user};
 use dioxus::prelude::*;
 use dioxus_logger::tracing::{info, Level};
 use futures::StreamExt;
@@ -180,12 +181,18 @@ fn sendMsg(
     mut modelOptions: Signal<Vec<SelectOption>>,
     mut send_disabled: Signal<bool>,
 ) {
+
     if msg != "" {
         use reqwest::Client;
-
+        let token = match get_user() {
+            Some(user)=> match user.auth_key {
+                Some(key) => key,
+                None => "".to_string(),
+            },
+            None => "".to_string()
+        };
         let mut history = use_context::<Signal<Vec<Message>>>();
         let id = history().len();
-
         history.write().push(Message {
             id: id,
             role: Role::User,
@@ -198,7 +205,7 @@ fn sendMsg(
         if msg.starts_with("/load") || msg.starts_with("/unload") {
             history.write().push(Message {
                 id: id,
-                role: Role::Admin,
+                role: Role::Administrator,
                 content: String::new(),
                 img: None,
                 loading: true,
@@ -207,6 +214,7 @@ fn sendMsg(
             spawn(async move {
                 let response = Client::new()
                     .post(format!("{}load", url))
+                    .bearer_auth(token)
                     .body(msg)
                     .send()
                     .await
@@ -255,6 +263,7 @@ fn sendMsg(
 
                 let mut stream = Client::new()
                     .post(format!("{}chat", url))
+                    .bearer_auth(token)
                     .json(&Request {
                         cmd: model_id.clone(),
                         system_prompt: system_prompt,
@@ -299,7 +308,7 @@ fn sendMsg(
     }
 }
 
-pub fn swtich_session(id: &str, mut model_id: Signal<String>,mut system_prompt: Signal<String>) {
+pub fn switch_session(id: &str, mut model_id: Signal<String>,mut system_prompt: Signal<String>) {
     let mut session = use_context::<Signal<Session>>();
     let session_value = session();
     let current_id = session_value.id.clone();
@@ -346,6 +355,7 @@ pub fn swtich_session(id: &str, mut model_id: Signal<String>,mut system_prompt: 
 
 #[component]
 pub fn Conversations(mut model_id: Signal<String>, mut system_prompt: Signal<String>, send_disabled: Signal<bool>) -> Element {
+    let mut do_delete_conv = use_signal(|| false);
     let session = use_context::<Signal<Session>>();
     let session_value = session();
     let mut store = Store::new().unwrap();
@@ -367,40 +377,70 @@ pub fn Conversations(mut model_id: Signal<String>, mut system_prompt: Signal<Str
         }
     }
     session_list.reverse();
+    let items: Vec<_> = session_list.iter().map(|sess| {(sess.id.clone(),sess.id.clone(),sess.name.clone())}).collect();
     rsx!(
-        div { class: "w-2/12 shadow-lg rounded-lg text-sm font-medium text-gray-500  md:me-4 mb-4 md:mb-0 h-5/6",
+        div { class: "w-1/5 shadow-lg rounded-lg text-sm font-medium text-gray-500  md:me-4 mb-4 md:mb-0",
+              style: "height:98%;",
             div { class: "border-b px-4 py-2 bg-gray-200",
                 h1 { class: "text-lg font-semibold", "Conversations" }
             }
 
-            ul { class: "flex-column mt-4 space-y space-y-4 text-sm font-medium text-gray-500 dark:text-gray-400 mb-4 md:me-2 md:ms-2 md:mb-0",
-
-                for sess in  session_list {
-                    if sess.id == current_id.clone() {
-                        li {
+            div { class: "flex-column mt-4 space-y space-y-4 text-sm overflow-y-auto font-medium text-gray-500 dark:text-gray-400 mb-4 md:me-2 md:ms-2 md:mb-0",
+                  style: "height:90%;",
+                for (id_for_switch,id_for_delete,name) in items {
+                    if id_for_switch == current_id.clone() {
+                        div { class:"flex  items-center px-4 py-3 text-white bg-blue-700 rounded-lg active w-full dark:bg-blue-600",
                             a {
                                 href: "#",
                                 "aria-current": "page",
-                                class: "inline-flex items-center px-4 py-3 text-white bg-blue-700 rounded-lg active w-full dark:bg-blue-600",
+                                class: "inline-flex w-full",
                                 onclick: move |evt| {
                                     if !send_disabled() {
-                                      swtich_session(sess.id.as_str(),model_id,system_prompt);
+                                      switch_session(id_for_switch.as_str(),model_id,system_prompt);
                                     }
                                 },
-                                "{sess.name}"
+                                "{name}"
                             }
+                            
                         }
                     } else {
-                        li {
+                        div { class:"flex items-center px-4 py-3 rounded-lg hover:text-gray-900 bg-gray-50 hover:bg-gray-100 w-full dark:bg-gray-800 dark:hover:bg-gray-700 dark:hover:text-white",
                             a {
                                 href: "#",
-                                class: "inline-flex items-center px-4 py-3 rounded-lg hover:text-gray-900 bg-gray-50 hover:bg-gray-100 w-full dark:bg-gray-800 dark:hover:bg-gray-700 dark:hover:text-white",
+                                class: "inline-flex w-full",
                                 onclick: move |evt| {
                                     if !send_disabled() {
-                                        swtich_session(sess.id.as_str(),model_id,system_prompt);
+                                        switch_session(id_for_switch.as_str(),model_id,system_prompt);
                                     }
                                 },
-                                "{sess.name}"
+                                "{name}"
+                            }
+                            
+                            button {
+                                r#type: "button",
+                                class: "text-gray-400 bg-transparent hover:bg-gray-200 hover:text-gray-900 rounded-lg text-sm w-8 h-8 ms-auto inline-flex justify-center items-center dark:hover:bg-gray-600 dark:hover:text-white",
+                                onclick: move |evt| {
+                                    let mut store = Store::new().unwrap();
+                                    if !send_disabled() {
+                                        store.remove_session(id_for_delete.clone().as_str());
+                                        do_delete_conv.set(true);
+                                    }
+                                },
+                                svg {
+                                    "xmlns": "http://www.w3.org/2000/svg",
+                                    "fill": "none",
+                                    "aria-hidden": "true",
+                                    "viewBox": "0 0 14 14",
+                                    class: "w-3 h-3",
+                                    path {
+                                        "d": "m1 1 6 6m0 0 6 6M7 7l6-6M7 7l-6 6",
+                                        "stroke": "currentColor",
+                                        "stroke-linejoin": "round",
+                                        "stroke-linecap": "round",
+                                        "stroke-width": "2"
+                                    }
+                                }
+                                span { class: "sr-only", "Close modal" }
                             }
                         }
                     }
@@ -408,6 +448,9 @@ pub fn Conversations(mut model_id: Signal<String>, mut system_prompt: Signal<Str
 
 
             }
+        }
+        if do_delete_conv() {
+            span { dangerous_inner_html: "<!--delete conversation re-rendering trigger--> "}
         }
     )
 }
@@ -423,6 +466,7 @@ fn new_conversation(mut session: Signal<Session>,mut messages: Signal<Vec<Messag
 
 pub fn app() -> Element {
     use_context_provider(|| Signal::new(Vec::<Message>::new()));
+
     let href = if let Some(window) = window() {
         if let Some(document) = window.document() {
             if let Some(location) = document.location() {
@@ -509,7 +553,8 @@ pub fn app() -> Element {
 
         Conversations { model_id, system_prompt, send_disabled }
 
-        div { class: "w-10/12 bg-white shadow-lg rounded-lg overflow-hidden flex flex-col h-5/6",
+        div { class: "w-4/5 bg-white shadow-lg rounded-lg overflow-hidden flex flex-col",
+              style: "height:98%;",
             div { class: "border-b px-4 py-2 bg-gray-200",
                 h1 { class: "text-lg font-semibold", "Chat Robot" }
             }
@@ -629,8 +674,10 @@ pub fn app() -> Element {
             }
         }
         ModelConfig { model_id, modelOptions, system_prompt }
+        LoginBox { endpoint }
         script {
             "initFlowbite();"
         }
+
     )
 }

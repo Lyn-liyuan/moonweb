@@ -16,7 +16,7 @@ pub async fn worker_server(ipc_name:String, model_id: String, temp: f64, top_p: 
             if req.cmd.eq("QUIT") {
                 break;
             }
-            let msg_list: Vec<Message> = req.msg_list.into_iter().filter(|msg|msg.role!=Role::Admin).collect();
+            let msg_list: Vec<Message> = req.msg_list.into_iter().filter(|msg|msg.role!=Role::Administrator).collect();
             let history =
                 pipeline.messages_chat_template(&msg_list, req.system_prompt.as_str());
             let _ = pipeline.run(&sender,history.as_str(), 1000usize).unwrap();    
