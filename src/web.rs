@@ -657,6 +657,10 @@ pub fn app() -> Element {
                     class: "cursor-pointer bg-gray-300 p-2 mr-4 rounded-lg hover:bg-gray-400",
                     onclick: move|evt| {
                         new_conversation(session,messages);
+                        let new_session = session.read();
+                        model_id.set(new_session.mode_id.clone());
+                        system_prompt.set(new_session.system_prompt.clone());
+                        
                     },
                     svg {
                         "stroke": "currentColor",
