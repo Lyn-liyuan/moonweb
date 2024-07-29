@@ -3,7 +3,7 @@ extern crate image_base64_wasm;
 
 use crate::data::{Message, Role, SelectOption, WebUser};
 use crate::web_state::{Session, Store, TempSession};
-use crate::authorization::{LoginBox,get_user};
+use crate::authorization::{LoginBox,get_user,show_login};
 use dioxus::prelude::*;
 use dioxus_logger::tracing::{info, Level};
 use futures::StreamExt;
@@ -37,8 +37,9 @@ fn Pulse() -> Element {
 fn ModelConfig(
     model_id: Signal<String>,
     modelOptions: Signal<Vec<SelectOption>>,
-    system_prompt: Signal<String>,
+    mut system_prompt: Signal<String>,
 ) -> Element {
+    let mut session = use_context::<Signal<Session>>();
     rsx!(
         div {
             "aria-hidden": "true",
@@ -86,15 +87,17 @@ fn ModelConfig(
                                     value: "{model_id}",
                                     onchange: move |event| {
                                         let value = event.value();
-                                        model_id.set(value);
+                                        model_id.set(value.clone());
+                                        let mut sess = session.write();
+                                        sess.mode_id = value;
                                     },
                                     option { "Select model" }
                                     for model in modelOptions() {
-                                    option {
-                                        value: "{model.value}",
-                                        selected: {model.selected},
-                                        "{model.text}"
-                                    }
+                                        option {
+                                            value: "{model.value}",
+                                            selected: {model.selected},
+                                            "{model.text}"
+                                        }
                                    }
                                 }
                             }
@@ -108,12 +111,15 @@ fn ModelConfig(
                                     rows: "4",
                                     placeholder: "Write System Prompt",
                                     class: "block p-2.5 w-full text-sm text-gray-900 bg-gray-50 rounded-lg border border-gray-300 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500",
-                                    id: "description",
+                                    value: "{system_prompt}",
+                                    id: "System Prompt",
                                     onchange: move |evt| {
                                         let value = evt.value();
-                                        system_prompt.set(value);
-                                    },
-                                    "{system_prompt}"
+                                        system_prompt.set(value.clone());
+                                        let mut sess = session.write();
+                                        sess.system_prompt = value;
+                                    }
+                                    
                                 }
                             }
                         }
@@ -181,7 +187,7 @@ fn sendMsg(
     mut modelOptions: Signal<Vec<SelectOption>>,
     mut send_disabled: Signal<bool>,
 ) {
-
+    
     if msg != "" {
         use reqwest::Client;
         let token = match get_user() {
@@ -310,18 +316,19 @@ fn sendMsg(
 
 pub fn switch_session(id: &str, mut model_id: Signal<String>,mut system_prompt: Signal<String>) {
     let mut session = use_context::<Signal<Session>>();
-    let session_value = session();
-    let current_id = session_value.id.clone();
     let mut temp_session = use_context::<Signal<TempSession>>();
     let mut messages = use_context::<Signal<Vec<Message>>>();
-    if current_id != id {
+    let current_id = session.read().id.clone();
+    if current_id != id { 
         let mut store = Store::new().unwrap();
+        // current session don't store.
+        if store.get_session(current_id.as_str()).is_none() {
+             temp_session.set(TempSession::new(&session()));
+        }
+        // load target session from store
         if let Some(new_session) = store.get_session(id) {
             if let Some(ref history) = new_session.history {
                 messages.set(history.clone());
-            }
-            if store.get_session(session().id.as_str()).is_none() {
-                temp_session.set(TempSession::new(&session()));
             }
             session.set(Session {
                 id: new_session.id,
@@ -338,19 +345,21 @@ pub fn switch_session(id: &str, mut model_id: Signal<String>,mut system_prompt: 
             model_id.set(new_session.mode_id);
             system_prompt.set(new_session.system_prompt);
         } else {
+            let new_session = Session {
+                id: temp_session.read().id.clone(),
+                name: temp_session.read().name.clone(),
+                mode_id: temp_session.read().mode_id.clone(),
+                system_prompt: temp_session.read().system_prompt.clone(),
+                history:  Some(Vec::<Message>::new()),
+            };
             messages.set(Vec::<Message>::new());
-            let new_session = temp_session.read();
-            session.set(Session {
-                id: new_session.id.clone(),
-                name: new_session.name.clone(),
-                mode_id: new_session.mode_id.clone(),
-                system_prompt: new_session.system_prompt.clone(),
-                history: Some(Vec::<Message>::new()),
-            });
             model_id.set(new_session.mode_id.clone());
+            info!(new_session.system_prompt);
             system_prompt.set(new_session.system_prompt.clone());
+            session.set(new_session);
         }
     }
+    
 }
 
 #[component]
@@ -396,7 +405,7 @@ pub fn Conversations(mut model_id: Signal<String>, mut system_prompt: Signal<Str
                                 class: "inline-flex w-full",
                                 onclick: move |evt| {
                                     if !send_disabled() {
-                                      switch_session(id_for_switch.as_str(),model_id,system_prompt);
+                                        switch_session(id_for_switch.as_str(),model_id,system_prompt);
                                     }
                                 },
                                 "{name}"
@@ -440,7 +449,7 @@ pub fn Conversations(mut model_id: Signal<String>, mut system_prompt: Signal<Str
                                         "stroke-width": "2"
                                     }
                                 }
-                                span { class: "sr-only", "Close modal" }
+                                span { class: "sr-only", "Remove Conversation" }
                             }
                         }
                     }
@@ -555,8 +564,32 @@ pub fn app() -> Element {
 
         div { class: "w-4/5 bg-white shadow-lg rounded-lg overflow-hidden flex flex-col",
               style: "height:98%;",
-            div { class: "border-b px-4 py-2 bg-gray-200",
-                h1 { class: "text-lg font-semibold", "Chat Robot" }
+            div { class: "flex border-b px-4 py-2 bg-gray-200",
+                h1 { class: "text-lg font-semibold text-gray-500", "Chat Robot" }
+                button {
+                    r#type: "button",
+                    class: "text-gray-400 bg-transparent hover:bg-gray-300 hover:text-gray-600 rounded-lg text-sm w-8 h-8 ms-auto inline-flex justify-center items-center dark:hover:bg-gray-600 dark:hover:text-white",
+                    onclick: move |evt| {
+                        show_login(true);
+                    },
+                    svg {
+                        "fill": "none",
+                        "xmlns": "http://www.w3.org/2000/svg",
+                        height: "24",
+                        "viewBox": "0 0 24 24",
+                        "aria-hidden": "true",
+                        width: "24",
+                        class: "w-6 h-6 text-gray-500 dark:text-white",
+                        path {
+                            "stroke": "currentColor",
+                            "stroke-width": "2",
+                            "stroke-linecap": "round",
+                            "stroke-linejoin": "round",
+                            "d": "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Zm0 0a8.949 8.949 0 0 0 4.951-1.488A3.987 3.987 0 0 0 13 16h-2a3.987 3.987 0 0 0-3.951 3.512A8.948 8.948 0 0 0 12 21Zm3-11a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"
+                        }
+                    }
+                    span { class: "sr-only", "Sign In or Sign Out" }
+                }
             }
             div { class: "flex-1 p-4 overflow-y-auto", id: "list",
                 for msg in messages() {
