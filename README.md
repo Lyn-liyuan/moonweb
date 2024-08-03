@@ -71,6 +71,7 @@ To integrate a new LLM model, follow these steps:
 - **July 19, 2024**: Added conversation management, using the browser local storage to store historical conversations.
 - **July 23, 2024**: Remove temperature and top_p configuration from the configuration dialog, so that each session can configure its own system prompts.
 - **July 29, 2024**: Implemented user login and the function of deleting conversations.
+- **Aug 4, 2024**: Implemented the black-forest-labs/FLUX.1-schnell model service. FLUX.1 [schnell] is a 12 billion parameter rectified flow transformer capable of generating images from text descriptions.
 
 **Contributing**
 

@@ -32,7 +32,7 @@ use tokio::time::Duration;
 use tower_http::services::{ServeDir, ServeFile};
 
 const SQIDS_ALPHABET: &str = "VRHIrU2je0gxcSGlzvMWBAkpufqDiyEoY931JLTC5wN6KbaQFPOdsXn48h7mZt";
-const ADMIN_TOKEN: &str = "5bfc427e-c7ca-4612-a445-76d7d14edede";
+const ADMIN_TOKEN: &str = "5bfc427e-c7ca-4612-a445-76d7d141eds";
 const USER_TOKEN: &str = "d272c71d-3579-4c85-b6cd-1f144190c98a";
 const SALT: &str = "Akpu#fqDiy@EoY931J_VRHIrU2";
 
